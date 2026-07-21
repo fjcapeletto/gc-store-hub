@@ -1,3 +1,0 @@
-# The hub client source lives here.
-# No .NET project is scaffolded yet — the desktop UI framework
-# (WPF vs WinUI 3 vs Avalonia) is a deferred decision.
