@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+# Gabriel Capeletto Store — Hub client (.NET)
+# Public repository. Nothing secret is allowed to land here, ever.
+# ---------------------------------------------------------------------------
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.rsuser
+*.sln.docstates
+*_i.c
+*_p.c
+
+# .NET
+project.lock.json
+project.fragment.lock.json
+*.nupkg
+*.snupkg
+.packages/
+packages/
+!packages/build/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+# ---------------------------------------------------------------------------
+# SECRETS — must never be committed (public repo, history is forever)
+# Real config comes from user-secrets (dev) and env / secret manager (prod).
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+appsettings.*.json
+!appsettings.example.json
+!appsettings.Development.example.json
+secrets.json
+*.pfx
+*.snk
+*.p12
+*.key
+*.pem
+
+# OS noise
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
