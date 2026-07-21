@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:GabrielCapelettoStore.Hub.ViewModels"
+        xmlns:catalog="using:GabrielCapelettoStore.Hub.Catalog"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
         x:Class="GabrielCapelettoStore.Hub.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
@@ -12,23 +13,83 @@
         Title="Gabriel Capeletto Store">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <!-- Design-time only; real DataContext is set in App.axaml.cs -->
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <!-- Empty-hub-first walking skeleton: no real catalog yet, just the shell. -->
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-        <TextBlock Text="{Binding StoreName}"
-                   FontSize="30" FontWeight="SemiBold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="{Binding EmptyStateMessage}"
-                   FontSize="16" Opacity="0.6"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="{Binding StatusLine}"
-                   FontSize="12" Opacity="0.4"
-                   Margin="0,24,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+    <Grid RowDefinitions="Auto,*" Margin="24">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
+                <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Center"
+                    Content="Reload"
+                    Command="{Binding ReloadCommand}"
+                    IsEnabled="{Binding !IsLoading}" />
+        </Grid>
+
+        <!-- Content: exactly one state is visible at a time -->
+        <Panel Grid.Row="1">
+
+            <!-- Loading -->
+            <StackPanel IsVisible="{Binding IsLoading}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <ProgressBar IsIndeterminate="True" Width="220" />
+                <TextBlock Text="Loading catalog…" HorizontalAlignment="Center" Opacity="0.6" />
+            </StackPanel>
+
+            <!-- Error (with retry) -->
+            <StackPanel IsVisible="{Binding HasError}" MaxWidth="440"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <TextBlock Text="Store unavailable" FontSize="18" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                           TextAlignment="Center" Opacity="0.6" />
+                <Button Content="Try again" Command="{Binding ReloadCommand}"
+                        HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Empty shelves (the empty-hub-first milestone) -->
+            <StackPanel IsVisible="{Binding ShowEmptyState}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                <TextBlock Text="The shelves are empty — for now."
+                           FontSize="16" Opacity="0.6" HorizontalAlignment="Center" />
+                <TextBlock Text="New apps will appear here automatically."
+                           FontSize="12" Opacity="0.4" HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Catalog -->
+            <ScrollViewer IsVisible="{Binding ShowCatalog}">
+                <ItemsControl ItemsSource="{Binding Apps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="catalog:CatalogApp">
+                            <Border Margin="0,0,0,10" Padding="16" CornerRadius="8"
+                                    Background="#11808080"
+                                    BorderThickness="1" BorderBrush="#33808080">
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                   FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Version, StringFormat='v{0}'}"
+                                                   FontSize="12" Opacity="0.5" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
+                                               FontSize="13" Opacity="0.7" />
+                                    <Border HorizontalAlignment="Left" CornerRadius="4"
+                                            Padding="6,2" Background="#22808080">
+                                        <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+        </Panel>
+    </Grid>
 
 </Window>
