@@ -17,6 +17,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly ICatalogSource _catalogSource;
     private readonly ICatalogStateStore _observationStore;
     private readonly IInstallStateStore _installStore;
+    private readonly ICatalogCache _cache;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -27,19 +28,21 @@ public partial class MainViewModel : ViewModelBase
         ICatalogSource catalogSource,
         ICatalogStateStore observationStore,
         IInstallStateStore installStore,
+        ICatalogCache cache,
         IDeviceFingerprintCollector fingerprintCollector,
         IIdentityBaselineStore baselineStore)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
         _installStore = installStore;
+        _cache = cache;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
 
     /// <summary>Design-time constructor: seeds the previewer with mixed states so badges/buttons show.</summary>
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
-        new NullFingerprintCollector(), new NullIdentityBaselineStore())
+        new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -80,7 +83,28 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowCatalog))]
     [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(ShowOfflineNotice))]
     public partial int AppCount { get; set; }
+
+    /// <summary>Whether the last fetch reached the store. False = showing the cached (last-known) catalog.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowOfflineNotice))]
+    [NotifyPropertyChangedFor(nameof(ConnectivityLabel))]
+    public partial bool IsOnline { get; set; } = true;
+
+    public string ConnectivityLabel => IsOnline ? "Store online" : "Store server offline";
+
+    [ObservableProperty]
+    public partial string OfflineNotice { get; set; } = "";
+
+    public bool ShowOfflineNotice => !IsOnline && AppCount > 0;
+
+    /// <summary>Transient status by the sync button: "Checking…" while trying, "Store server offline" on failure.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSyncStatus))]
+    public partial string SyncStatus { get; set; } = "";
+
+    public bool HasSyncStatus => !string.IsNullOrEmpty(SyncStatus);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasNews))]
@@ -125,10 +149,12 @@ public partial class MainViewModel : ViewModelBase
             ErrorMessage = null;
         }
 
+        SyncStatus = "Checking…";
+        var now = DateTimeOffset.UtcNow;
+
         try
         {
             var manifest = await _catalogSource.GetCatalogAsync();
-            var now = DateTimeOffset.UtcNow;
 
             var previous = _observationStore.Load();
             var firstRun = previous is null;
@@ -160,23 +186,40 @@ public partial class MainViewModel : ViewModelBase
             _observation = observation;
             _install = _installStore.Load();
 
+            IsOnline = true;
+            OfflineNotice = "";
+            SyncStatus = "";
             Rebuild(now);
 
-            // A successful fetch clears any prior error — including a silent refresh
-            // that recovers after the store was briefly unreachable.
+            // A successful fetch clears any prior error and refreshes the offline cache.
             ErrorMessage = null;
+            _cache.Save(manifest, now);
         }
         catch (Exception ex)
         {
-            if (!silent)
+            IsOnline = false;
+            SyncStatus = "Store server offline";
+
+            var cached = _cache.Load();
+            if (cached is not null)
             {
+                // Offline / backend down, but we have last-known shelves → show them, not an error.
+                _manifest = cached.Manifest;
+                _observation = _observationStore.Load() ?? new CatalogObservationState();
+                _install = _installStore.Load();
+                ErrorMessage = null;
+                Rebuild(now);
+                OfflineNotice = $"Showing last known catalog · synced {RelativeTime(cached.SyncedAt, now)}";
+            }
+            else if (!silent)
+            {
+                // No cache at all (first-run offline) → the honest hard error.
                 Apps.Clear();
                 AppCount = 0;
                 NewCount = 0;
                 UpdatedCount = 0;
                 ErrorMessage = $"Couldn't reach the store catalog.\n{ex.Message}";
             }
-            // Silent failure: keep whatever is already on the shelves.
         }
         finally
         {
@@ -203,6 +246,7 @@ public partial class MainViewModel : ViewModelBase
 
         var items = new List<ShelfItemViewModel>(_manifest.Apps.Count);
         var signature = new StringBuilder();
+        signature.Append(IsOnline ? "on;" : "off;");
         var newCount = 0;
         var updatedCount = 0;
 
@@ -243,7 +287,7 @@ public partial class MainViewModel : ViewModelBase
                 }
             }
 
-            items.Add(new ShelfItemViewModel(app, installedVersion, updateAvailable, status, InstallApp));
+            items.Add(new ShelfItemViewModel(app, installedVersion, updateAvailable, status, IsOnline, InstallApp));
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append(';');
         }
@@ -306,6 +350,27 @@ public partial class MainViewModel : ViewModelBase
 
         // Fallback for non-numeric versions: any difference counts as an update.
         return !string.Equals(candidate, baseline, StringComparison.Ordinal);
+    }
+
+    private static string RelativeTime(DateTimeOffset then, DateTimeOffset now)
+    {
+        var elapsed = now - then;
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            return "just now";
+        }
+
+        if (elapsed < TimeSpan.FromHours(1))
+        {
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        }
+
+        if (elapsed < TimeSpan.FromDays(1))
+        {
+            return $"{(int)elapsed.TotalHours}h ago";
+        }
+
+        return $"{(int)elapsed.TotalDays}d ago";
     }
 
     private string BuildNewsSummary()

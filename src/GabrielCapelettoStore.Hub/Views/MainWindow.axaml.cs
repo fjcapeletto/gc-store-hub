@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -9,7 +10,9 @@ namespace GabrielCapelettoStore.Hub.Views;
 
 public partial class MainWindow : Window
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromHours(1);
+    // Gentle cadence while reachable; a faster retry while offline so recovery feels automatic.
+    private static readonly TimeSpan OnlineInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan OfflineRetryInterval = TimeSpan.FromSeconds(60);
 
     // Ignore focus-triggered refreshes that come right after another one — including
     // the very click that activates the window (which must not rebuild the shelves).
@@ -31,10 +34,23 @@ public partial class MainWindow : Window
 
     private void OnOpened(object? sender, EventArgs e)
     {
-        // Auto-refresh on a gentle hourly cadence while the window is open.
-        _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
+        _refreshTimer = new DispatcherTimer { Interval = OnlineInterval };
         _refreshTimer.Tick += (_, _) => Refresh();
         _refreshTimer.Start();
+
+        if (ViewModel is { } vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    // Adaptive recovery: retry faster while offline, back off once reachable again.
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsOnline) && _refreshTimer is not null && ViewModel is { } vm)
+        {
+            _refreshTimer.Interval = vm.IsOnline ? OnlineInterval : OfflineRetryInterval;
+        }
     }
 
     // Re-check when the user brings the window back into focus, but debounced so a
@@ -51,7 +67,14 @@ public partial class MainWindow : Window
         Refresh();
     }
 
-    private void OnClosed(object? sender, EventArgs e) => _refreshTimer?.Stop();
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        _refreshTimer?.Stop();
+        if (ViewModel is { } vm)
+        {
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+    }
 
     private void Refresh()
     {

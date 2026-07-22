@@ -28,14 +28,21 @@
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
                     <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
+                    <TextBlock Text="{Binding OfflineNotice}" IsVisible="{Binding ShowOfflineNotice}"
+                               FontSize="12" Foreground="#B58900" Margin="0,2,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="Checking…" IsVisible="{Binding IsRefreshing}"
-                               FontSize="12" Opacity="0.5" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding SyncStatus}" IsVisible="{Binding HasSyncStatus}"
+                               FontSize="12" Opacity="0.6" VerticalAlignment="Center" Margin="0,0,4,0" />
                     <Button Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
                             ToolTip.Tip="Check for updates"
                             Background="Transparent" BorderThickness="0" Padding="6"
                             FontSize="18" Content="⟳" />
+                    <!-- Connectivity LED: green = store online, red = offline -->
+                    <Panel Width="30" VerticalAlignment="Center" ToolTip.Tip="{Binding ConnectivityLabel}">
+                        <Ellipse Width="11" Height="11" Fill="#2E9E44" IsVisible="{Binding IsOnline}" />
+                        <Ellipse Width="11" Height="11" Fill="#D64545" IsVisible="{Binding !IsOnline}" />
+                    </Panel>
                     <Button Command="{Binding OpenSettingsCommand}"
                             ToolTip.Tip="Settings"
                             Background="Transparent" BorderThickness="0" Padding="6"

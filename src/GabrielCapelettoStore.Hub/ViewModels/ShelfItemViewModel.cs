@@ -13,18 +13,21 @@ namespace GabrielCapelettoStore.Hub.ViewModels;
 public sealed partial class ShelfItemViewModel : ObservableObject
 {
     private readonly Action<ShelfItemViewModel>? _installAction;
+    private readonly bool _isOnline;
 
     public ShelfItemViewModel(
         CatalogApp app,
         string? installedVersion,
         bool updateAvailable,
         NoveltyStatus status,
+        bool isOnline = true,
         Action<ShelfItemViewModel>? installAction = null)
     {
         App = app;
         InstalledVersion = installedVersion;
         UpdateAvailable = updateAvailable;
         Status = status;
+        _isOnline = isOnline;
         _installAction = installAction;
     }
 
@@ -59,7 +62,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         : UpdateAvailable ? "Update"
         : "Installed";
 
-    public bool CanInstall => !IsInstalled || UpdateAvailable;
+    /// <summary>Enabled only when there is an action to take AND the store is reachable
+    /// (installing/updating downloads from the backend — not possible offline).</summary>
+    public bool CanInstall => (!IsInstalled || UpdateAvailable) && _isOnline;
 
     [RelayCommand]
     private void Install() => _installAction?.Invoke(this);

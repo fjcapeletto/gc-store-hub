@@ -37,6 +37,7 @@ public partial class App : Application
             ICatalogSource catalogSource = new HttpCatalogSource(httpClient, catalogOptions);
             ICatalogStateStore observationStore = new FileCatalogStateStore();
             IInstallStateStore installStore = new FileInstallStateStore();
+            ICatalogCache catalogCache = new FileCatalogCache();
 
             IDeviceFingerprintCollector fingerprintCollector;
             if (OperatingSystem.IsWindows())
@@ -51,7 +52,7 @@ public partial class App : Application
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
             var viewModel = new MainViewModel(
-                catalogSource, observationStore, installStore, fingerprintCollector, baselineStore);
+                catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore);
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).
