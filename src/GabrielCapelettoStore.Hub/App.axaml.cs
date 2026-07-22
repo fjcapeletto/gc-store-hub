@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.ViewModels;
 using GabrielCapelettoStore.Hub.Views;
 using Microsoft.Extensions.Configuration;
@@ -37,7 +38,17 @@ public partial class App : Application
             ICatalogStateStore observationStore = new FileCatalogStateStore();
             IInstallStateStore installStore = new FileInstallStateStore();
 
-            var viewModel = new MainViewModel(catalogSource, observationStore, installStore);
+            IDeviceFingerprintCollector fingerprintCollector;
+            if (OperatingSystem.IsWindows())
+            {
+                fingerprintCollector = new WindowsFingerprintCollector();
+            }
+            else
+            {
+                fingerprintCollector = new NullFingerprintCollector();
+            }
+
+            var viewModel = new MainViewModel(catalogSource, observationStore, installStore, fingerprintCollector);
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).

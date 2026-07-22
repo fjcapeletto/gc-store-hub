@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:GabrielCapelettoStore.Hub.ViewModels"
+        xmlns:identity="using:GabrielCapelettoStore.Hub.Identity"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
@@ -16,116 +17,162 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="24">
+    <Panel>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
-                <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <TextBlock Text="Checking…" IsVisible="{Binding IsRefreshing}"
-                           FontSize="12" Opacity="0.5" VerticalAlignment="Center" />
-                <!-- Discrete sync icon: manual, instant check for updates -->
-                <Button Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
-                        ToolTip.Tip="Check for updates"
-                        Background="Transparent" BorderThickness="0" Padding="6"
-                        FontSize="18" Content="⟳" />
-            </StackPanel>
-        </Grid>
+        <!-- ================= CATALOG ================= -->
+        <Grid IsVisible="{Binding !ShowSettings}" RowDefinitions="Auto,Auto,*" Margin="24">
 
-        <!-- Session greeting: what changed since the last visit; dismissible -->
-        <Border Grid.Row="1" IsVisible="{Binding HasNews}"
-                Margin="0,0,0,14" Padding="12,8" CornerRadius="6"
-                Background="#1F4CAF50" BorderBrush="#664CAF50" BorderThickness="1">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Grid.Column="0" VerticalAlignment="Center"
-                           Text="{Binding NewsSummary, StringFormat='✨  {0} since your last visit'}"
-                           FontSize="13" FontWeight="SemiBold" />
-                <Button Grid.Column="1" Command="{Binding DismissBannerCommand}"
-                        ToolTip.Tip="Dismiss"
-                        Background="Transparent" BorderThickness="0" Padding="6,2"
-                        FontSize="13" Content="✕" />
+            <!-- Header -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
+                    <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="Checking…" IsVisible="{Binding IsRefreshing}"
+                               FontSize="12" Opacity="0.5" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <Button Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
+                            ToolTip.Tip="Check for updates"
+                            Background="Transparent" BorderThickness="0" Padding="6"
+                            FontSize="18" Content="⟳" />
+                    <Button Command="{Binding OpenSettingsCommand}"
+                            ToolTip.Tip="Settings"
+                            Background="Transparent" BorderThickness="0" Padding="6"
+                            FontSize="18" Content="⚙" />
+                </StackPanel>
             </Grid>
-        </Border>
 
-        <!-- Content: exactly one state is visible at a time -->
-        <Panel Grid.Row="2">
+            <!-- Session greeting -->
+            <Border Grid.Row="1" IsVisible="{Binding HasNews}"
+                    Margin="0,0,0,14" Padding="12,8" CornerRadius="6"
+                    Background="#1F4CAF50" BorderBrush="#664CAF50" BorderThickness="1">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                               Text="{Binding NewsSummary, StringFormat='✨  {0} since your last visit'}"
+                               FontSize="13" FontWeight="SemiBold" />
+                    <Button Grid.Column="1" Command="{Binding DismissBannerCommand}"
+                            ToolTip.Tip="Dismiss"
+                            Background="Transparent" BorderThickness="0" Padding="6,2"
+                            FontSize="13" Content="✕" />
+                </Grid>
+            </Border>
 
-            <!-- Loading (first load only) -->
-            <StackPanel IsVisible="{Binding IsLoading}"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <ProgressBar IsIndeterminate="True" Width="220" />
-                <TextBlock Text="Loading catalog…" HorizontalAlignment="Center" Opacity="0.6" />
-            </StackPanel>
+            <!-- Content states -->
+            <Panel Grid.Row="2">
 
-            <!-- Error (with retry) -->
-            <StackPanel IsVisible="{Binding HasError}" MaxWidth="440"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <TextBlock Text="Store unavailable" FontSize="18" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
-                           TextAlignment="Center" Opacity="0.6" />
-                <Button Content="Try again" Command="{Binding SyncCommand}"
-                        HorizontalAlignment="Center" />
-            </StackPanel>
+                <StackPanel IsVisible="{Binding IsLoading}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                    <ProgressBar IsIndeterminate="True" Width="220" />
+                    <TextBlock Text="Loading catalog…" HorizontalAlignment="Center" Opacity="0.6" />
+                </StackPanel>
 
-            <!-- Empty shelves -->
-            <StackPanel IsVisible="{Binding ShowEmptyState}"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                <TextBlock Text="The shelves are empty — for now."
-                           FontSize="16" Opacity="0.6" HorizontalAlignment="Center" />
-                <TextBlock Text="New apps will appear here automatically."
-                           FontSize="12" Opacity="0.4" HorizontalAlignment="Center" />
-            </StackPanel>
+                <StackPanel IsVisible="{Binding HasError}" MaxWidth="440"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                    <TextBlock Text="Store unavailable" FontSize="18" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                               TextAlignment="Center" Opacity="0.6" />
+                    <Button Content="Try again" Command="{Binding SyncCommand}"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
 
-            <!-- Catalog -->
-            <ScrollViewer IsVisible="{Binding ShowCatalog}">
-                <ItemsControl ItemsSource="{Binding Apps}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ShelfItemViewModel">
-                            <Border Margin="0,0,0,10" Padding="16" CornerRadius="8"
-                                    Background="#11808080"
-                                    BorderThickness="1" BorderBrush="#33808080">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel Grid.Column="0" Spacing="6">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="{Binding Name}" FontSize="16"
-                                                       FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <!-- NEW badge (green) — only for not-installed apps -->
-                                            <Border IsVisible="{Binding IsNew}" VerticalAlignment="Center"
-                                                    Background="#2E7D32" CornerRadius="4" Padding="6,2">
-                                                <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
-                                                           Foreground="White" />
-                                            </Border>
-                                            <!-- UPDATE badge (blue) — only for installed apps with a newer version -->
-                                            <Border IsVisible="{Binding IsUpdated}" VerticalAlignment="Center"
-                                                    Background="#1565C0" CornerRadius="4" Padding="6,2">
-                                                <TextBlock Text="UPDATE" FontSize="10" FontWeight="Bold"
-                                                           Foreground="White" />
+                <StackPanel IsVisible="{Binding ShowEmptyState}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                    <TextBlock Text="The shelves are empty — for now."
+                               FontSize="16" Opacity="0.6" HorizontalAlignment="Center" />
+                    <TextBlock Text="New apps will appear here automatically."
+                               FontSize="12" Opacity="0.4" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <ScrollViewer IsVisible="{Binding ShowCatalog}">
+                    <ItemsControl ItemsSource="{Binding Apps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ShelfItemViewModel">
+                                <Border Margin="0,0,0,10" Padding="16" CornerRadius="8"
+                                        Background="#11808080"
+                                        BorderThickness="1" BorderBrush="#33808080">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Spacing="6">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Name}" FontSize="16"
+                                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Border IsVisible="{Binding IsNew}" VerticalAlignment="Center"
+                                                        Background="#2E7D32" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
+                                                               Foreground="White" />
+                                                </Border>
+                                                <Border IsVisible="{Binding IsUpdated}" VerticalAlignment="Center"
+                                                        Background="#1565C0" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="UPDATE" FontSize="10" FontWeight="Bold"
+                                                               Foreground="White" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
+                                                       FontSize="13" Opacity="0.7" />
+                                            <TextBlock Text="{Binding VersionSubline}" FontSize="12" Opacity="0.55" />
+                                            <Border HorizontalAlignment="Left" CornerRadius="4"
+                                                    Padding="6,2" Background="#22808080">
+                                                <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
                                             </Border>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
-                                                   FontSize="13" Opacity="0.7" />
-                                        <TextBlock Text="{Binding VersionSubline}" FontSize="12" Opacity="0.55" />
-                                        <Border HorizontalAlignment="Left" CornerRadius="4"
-                                                Padding="6,2" Background="#22808080">
-                                            <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
-                                        </Border>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="92"
-                                            Content="{Binding InstallButtonText}"
-                                            Command="{Binding InstallCommand}"
-                                            IsEnabled="{Binding CanInstall}" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                                        <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="92"
+                                                Content="{Binding InstallButtonText}"
+                                                Command="{Binding InstallCommand}"
+                                                IsEnabled="{Binding CanInstall}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
 
-        </Panel>
-    </Grid>
+            </Panel>
+        </Grid>
+
+        <!-- ================= SETTINGS ================= -->
+        <Grid IsVisible="{Binding ShowSettings}" RowDefinitions="Auto,*" Margin="24">
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
+                <Button Command="{Binding CloseSettingsCommand}"
+                        ToolTip.Tip="Back"
+                        Background="Transparent" BorderThickness="0" Padding="6"
+                        FontSize="18" Content="←" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1">
+                <StackPanel Spacing="12" MaxWidth="620" HorizontalAlignment="Left">
+
+                    <TextBlock Text="This device" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding DeviceIdentity.Summary}" Opacity="0.7"
+                               TextWrapping="Wrap" FontSize="13" />
+
+                    <Border CornerRadius="8" Background="#11808080"
+                            BorderThickness="1" BorderBrush="#33808080" Padding="4,8">
+                        <ItemsControl ItemsSource="{Binding DeviceIdentity.Signals}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="identity:SignalRow">
+                                    <Grid ColumnDefinitions="190,*" Margin="12,6">
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                   FontSize="13" Opacity="0.6" VerticalAlignment="Center" />
+                                        <SelectableTextBlock Grid.Column="1" Text="{Binding Value}"
+                                                             FontSize="13" TextWrapping="Wrap"
+                                                             FontFamily="Cascadia Mono,Consolas,monospace" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Opacity="0.5"
+                               Text="These are the hardware signals used to recognize this device. They are readable by any local tool — none is a secret, and none is your license key." />
+
+                    <Button Content="Copy diagnostics" Click="OnCopyDiagnostics" HorizontalAlignment="Left" />
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+    </Panel>
 
 </Window>

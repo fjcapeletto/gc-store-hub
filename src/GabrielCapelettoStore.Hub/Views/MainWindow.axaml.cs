@@ -1,5 +1,7 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using GabrielCapelettoStore.Hub.ViewModels;
 
@@ -56,6 +58,15 @@ public partial class MainWindow : Window
         if (ViewModel is { } vm)
         {
             _ = vm.RefreshAsync();
+        }
+    }
+
+    private void OnCopyDiagnostics(object? sender, RoutedEventArgs e)
+    {
+        var text = ViewModel?.DeviceIdentity.DiagnosticsText;
+        if (!string.IsNullOrEmpty(text) && Clipboard is not null)
+        {
+            _ = Clipboard.SetTextAsync(text);
         }
     }
 }

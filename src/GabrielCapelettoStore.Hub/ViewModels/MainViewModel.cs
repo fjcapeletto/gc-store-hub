@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Identity;
 
 namespace GabrielCapelettoStore.Hub.ViewModels;
 
@@ -25,15 +26,19 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel(
         ICatalogSource catalogSource,
         ICatalogStateStore observationStore,
-        IInstallStateStore installStore)
+        IInstallStateStore installStore,
+        IDeviceFingerprintCollector fingerprintCollector)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
         _installStore = installStore;
+        DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector);
     }
 
     /// <summary>Design-time constructor: seeds the previewer with mixed states so badges/buttons show.</summary>
-    public MainViewModel() : this(new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore())
+    public MainViewModel() : this(
+        new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
+        new NullFingerprintCollector())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -46,6 +51,13 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string StoreName { get; set; } = "Gabriel Capeletto Store";
+
+    /// <summary>The "This device" identity section shown in Settings.</summary>
+    public DeviceIdentityViewModel DeviceIdentity { get; }
+
+    /// <summary>Whether the Settings view is showing instead of the catalog.</summary>
+    [ObservableProperty]
+    public partial bool ShowSettings { get; set; }
 
     public ObservableCollection<ShelfItemViewModel> Apps { get; } = [];
 
@@ -148,6 +160,10 @@ public partial class MainViewModel : ViewModelBase
             _install = _installStore.Load();
 
             Rebuild(now);
+
+            // A successful fetch clears any prior error — including a silent refresh
+            // that recovers after the store was briefly unreachable.
+            ErrorMessage = null;
         }
         catch (Exception ex)
         {
@@ -269,6 +285,16 @@ public partial class MainViewModel : ViewModelBase
 
     [RelayCommand]
     private Task Sync() => RefreshAsync();
+
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        DeviceIdentity.Load();
+        ShowSettings = true;
+    }
+
+    [RelayCommand]
+    private void CloseSettings() => ShowSettings = false;
 
     private static bool IsNewer(string candidate, string baseline)
     {
