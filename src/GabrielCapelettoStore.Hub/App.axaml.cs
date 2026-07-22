@@ -34,8 +34,10 @@ public partial class App : Application
 
             var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
             ICatalogSource catalogSource = new HttpCatalogSource(httpClient, catalogOptions);
+            ICatalogStateStore observationStore = new FileCatalogStateStore();
+            IInstallStateStore installStore = new FileInstallStateStore();
 
-            var viewModel = new MainViewModel(catalogSource);
+            var viewModel = new MainViewModel(catalogSource, observationStore, installStore);
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).

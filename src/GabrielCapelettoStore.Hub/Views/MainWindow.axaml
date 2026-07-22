@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:GabrielCapelettoStore.Hub.ViewModels"
-        xmlns:catalog="using:GabrielCapelettoStore.Hub.Catalog"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
@@ -17,7 +16,7 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,*" Margin="24">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="24">
 
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
@@ -25,16 +24,36 @@
                 <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
                 <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
             </StackPanel>
-            <Button Grid.Column="1" VerticalAlignment="Center"
-                    Content="Reload"
-                    Command="{Binding ReloadCommand}"
-                    IsEnabled="{Binding !IsLoading}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="Checking…" IsVisible="{Binding IsRefreshing}"
+                           FontSize="12" Opacity="0.5" VerticalAlignment="Center" />
+                <!-- Discrete sync icon: manual, instant check for updates -->
+                <Button Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
+                        ToolTip.Tip="Check for updates"
+                        Background="Transparent" BorderThickness="0" Padding="6"
+                        FontSize="18" Content="⟳" />
+            </StackPanel>
         </Grid>
 
-        <!-- Content: exactly one state is visible at a time -->
-        <Panel Grid.Row="1">
+        <!-- Session greeting: what changed since the last visit; dismissible -->
+        <Border Grid.Row="1" IsVisible="{Binding HasNews}"
+                Margin="0,0,0,14" Padding="12,8" CornerRadius="6"
+                Background="#1F4CAF50" BorderBrush="#664CAF50" BorderThickness="1">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                           Text="{Binding NewsSummary, StringFormat='✨  {0} since your last visit'}"
+                           FontSize="13" FontWeight="SemiBold" />
+                <Button Grid.Column="1" Command="{Binding DismissBannerCommand}"
+                        ToolTip.Tip="Dismiss"
+                        Background="Transparent" BorderThickness="0" Padding="6,2"
+                        FontSize="13" Content="✕" />
+            </Grid>
+        </Border>
 
-            <!-- Loading -->
+        <!-- Content: exactly one state is visible at a time -->
+        <Panel Grid.Row="2">
+
+            <!-- Loading (first load only) -->
             <StackPanel IsVisible="{Binding IsLoading}"
                         HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressBar IsIndeterminate="True" Width="220" />
@@ -48,11 +67,11 @@
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
                            TextAlignment="Center" Opacity="0.6" />
-                <Button Content="Try again" Command="{Binding ReloadCommand}"
+                <Button Content="Try again" Command="{Binding SyncCommand}"
                         HorizontalAlignment="Center" />
             </StackPanel>
 
-            <!-- Empty shelves (the empty-hub-first milestone) -->
+            <!-- Empty shelves -->
             <StackPanel IsVisible="{Binding ShowEmptyState}"
                         HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                 <TextBlock Text="The shelves are empty — for now."
@@ -65,24 +84,41 @@
             <ScrollViewer IsVisible="{Binding ShowCatalog}">
                 <ItemsControl ItemsSource="{Binding Apps}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="catalog:CatalogApp">
+                        <DataTemplate x:DataType="vm:ShelfItemViewModel">
                             <Border Margin="0,0,0,10" Padding="16" CornerRadius="8"
                                     Background="#11808080"
                                     BorderThickness="1" BorderBrush="#33808080">
-                                <StackPanel Spacing="6">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                   FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Version, StringFormat='v{0}'}"
-                                                   FontSize="12" Opacity="0.5" VerticalAlignment="Center" />
-                                    </Grid>
-                                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
-                                               FontSize="13" Opacity="0.7" />
-                                    <Border HorizontalAlignment="Left" CornerRadius="4"
-                                            Padding="6,2" Background="#22808080">
-                                        <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
-                                    </Border>
-                                </StackPanel>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Name}" FontSize="16"
+                                                       FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <!-- NEW badge (green) — only for not-installed apps -->
+                                            <Border IsVisible="{Binding IsNew}" VerticalAlignment="Center"
+                                                    Background="#2E7D32" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
+                                                           Foreground="White" />
+                                            </Border>
+                                            <!-- UPDATE badge (blue) — only for installed apps with a newer version -->
+                                            <Border IsVisible="{Binding IsUpdated}" VerticalAlignment="Center"
+                                                    Background="#1565C0" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="UPDATE" FontSize="10" FontWeight="Bold"
+                                                           Foreground="White" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
+                                                   FontSize="13" Opacity="0.7" />
+                                        <TextBlock Text="{Binding VersionSubline}" FontSize="12" Opacity="0.55" />
+                                        <Border HorizontalAlignment="Left" CornerRadius="4"
+                                                Padding="6,2" Background="#22808080">
+                                            <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
+                                        </Border>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="92"
+                                            Content="{Binding InstallButtonText}"
+                                            Command="{Binding InstallCommand}"
+                                            IsEnabled="{Binding CanInstall}" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
