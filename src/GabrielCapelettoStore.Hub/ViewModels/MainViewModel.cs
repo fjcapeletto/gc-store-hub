@@ -27,18 +27,19 @@ public partial class MainViewModel : ViewModelBase
         ICatalogSource catalogSource,
         ICatalogStateStore observationStore,
         IInstallStateStore installStore,
-        IDeviceFingerprintCollector fingerprintCollector)
+        IDeviceFingerprintCollector fingerprintCollector,
+        IIdentityBaselineStore baselineStore)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
         _installStore = installStore;
-        DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector);
+        DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
 
     /// <summary>Design-time constructor: seeds the previewer with mixed states so badges/buttons show.</summary>
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
-        new NullFingerprintCollector())
+        new NullFingerprintCollector(), new NullIdentityBaselineStore())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));

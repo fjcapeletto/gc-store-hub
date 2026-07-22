@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 
 namespace GabrielCapelettoStore.Hub.Identity;
 
@@ -18,6 +20,7 @@ public sealed class WindowsFingerprintCollector : IDeviceFingerprintCollector
     public DeviceFingerprint Collect()
     {
         var (tpmPresent, tpmVersion) = ReadTpm();
+        var macs = ReadPhysicalMacs();
 
         return new DeviceFingerprint
         {
@@ -26,9 +29,11 @@ public sealed class WindowsFingerprintCollector : IDeviceFingerprintCollector
             ProcessorId = WmiFirst("Win32_Processor", "ProcessorId"),
             Manufacturer = WmiFirst("Win32_ComputerSystem", "Manufacturer"),
             Model = WmiFirst("Win32_ComputerSystem", "Model"),
-            PermanentMac = ReadPhysicalMac(),
+            PermanentMac = macs.Count > 0 ? macs[0] : null,
+            PhysicalMacs = macs,
             TpmPresent = tpmPresent,
             TpmVersion = tpmVersion,
+            TpmEkPublicHash = ReadTpmEkPublicHash(),
         };
     }
 
@@ -57,32 +62,27 @@ public sealed class WindowsFingerprintCollector : IDeviceFingerprintCollector
         return null;
     }
 
-    private static string? ReadPhysicalMac()
+    private static List<string> ReadPhysicalMacs()
     {
         try
         {
-            var candidates = NetworkInterface.GetAllNetworkInterfaces()
+            return NetworkInterface.GetAllNetworkInterfaces()
                 .Where(n => n.NetworkInterfaceType is NetworkInterfaceType.Ethernet
                                                     or NetworkInterfaceType.Wireless80211)
                 .Where(n => !IsVirtual(n))
-                // Prefer wired (its MAC is the burned-in one; Wi-Fi may be randomized).
-                .OrderBy(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 1 : 0);
-
-            foreach (var nic in candidates)
-            {
-                var bytes = nic.GetPhysicalAddress().GetAddressBytes();
-                if (bytes.Length == 6)
-                {
-                    return string.Join(":", bytes.Select(b => b.ToString("X2")));
-                }
-            }
+                // Wired first (its MAC is the burned-in one; Wi-Fi may be randomized).
+                .OrderBy(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 1 : 0)
+                .Select(n => n.GetPhysicalAddress().GetAddressBytes())
+                .Where(b => b.Length == 6)
+                .Select(b => string.Join(":", b.Select(x => x.ToString("X2"))))
+                .Where(FingerprintHygiene.IsDistinctiveMac)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
         catch
         {
-            // Best-effort.
+            return [];
         }
-
-        return null;
     }
 
     private static bool IsVirtual(NetworkInterface nic)
@@ -133,5 +133,53 @@ public sealed class WindowsFingerprintCollector : IDeviceFingerprintCollector
         }
 
         return (false, null);
+    }
+
+    // --- TPM endorsement-key public via the Platform Crypto Provider — non-admin, per-device unique. ---
+
+    [DllImport("ncrypt.dll", CharSet = CharSet.Unicode)]
+    private static extern int NCryptOpenStorageProvider(out IntPtr phProvider, string pszProviderName, uint dwFlags);
+
+    [DllImport("ncrypt.dll", CharSet = CharSet.Unicode)]
+    private static extern int NCryptGetProperty(
+        IntPtr hObject, string pszProperty, byte[]? pbOutput, int cbOutput, out int pcbResult, uint dwFlags);
+
+    [DllImport("ncrypt.dll")]
+    private static extern int NCryptFreeObject(IntPtr hObject);
+
+    private static string? ReadTpmEkPublicHash()
+    {
+        var provider = IntPtr.Zero;
+        try
+        {
+            if (NCryptOpenStorageProvider(out provider, "Microsoft Platform Crypto Provider", 0) != 0)
+            {
+                return null;
+            }
+
+            if (NCryptGetProperty(provider, "PCP_EKPUB", null, 0, out var size, 0) != 0 || size <= 0)
+            {
+                return null;
+            }
+
+            var buffer = new byte[size];
+            if (NCryptGetProperty(provider, "PCP_EKPUB", buffer, size, out size, 0) != 0)
+            {
+                return null;
+            }
+
+            return Convert.ToHexString(SHA256.HashData(buffer.AsSpan(0, size)));
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (provider != IntPtr.Zero)
+            {
+                NCryptFreeObject(provider);
+            }
+        }
     }
 }

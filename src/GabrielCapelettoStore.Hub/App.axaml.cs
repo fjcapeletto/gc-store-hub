@@ -48,7 +48,10 @@ public partial class App : Application
                 fingerprintCollector = new NullFingerprintCollector();
             }
 
-            var viewModel = new MainViewModel(catalogSource, observationStore, installStore, fingerprintCollector);
+            IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
+
+            var viewModel = new MainViewModel(
+                catalogSource, observationStore, installStore, fingerprintCollector, baselineStore);
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).
