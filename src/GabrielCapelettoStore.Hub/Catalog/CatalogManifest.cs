@@ -23,6 +23,9 @@ public sealed record CatalogApp
     public required string Version { get; init; }
     public string? Summary { get; init; }
 
+    /// <summary>Glyph key for the chip's inner identity (e.g. "cloud", "music"); a real icon URL later.</summary>
+    public string? Icon { get; init; }
+
     /// <summary>Which identity the app declares it needs. Anchors the three archetypes.</summary>
     public AppIdentityMode IdentityMode { get; init; } = AppIdentityMode.DeviceOnly;
 }

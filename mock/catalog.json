@@ -6,49 +6,56 @@
       "name": "Weather",
       "version": "1.3.0",
       "summary": "Local forecast at a glance.",
-      "identityMode": "device-only"
+      "identityMode": "device-only",
+      "icon": "cloud"
     },
     {
       "id": "com.gc.notes",
       "name": "Notes",
       "version": "1.2.0",
       "summary": "Quick notes that sync to your account.",
-      "identityMode": "account-required"
+      "identityMode": "account-required",
+      "icon": "notes"
     },
     {
       "id": "com.gc.sensorbridge",
       "name": "Sensor Bridge",
       "version": "0.3.0",
       "summary": "Serial / Modbus gateway for industrial sensors. Works offline, richer when signed in.",
-      "identityMode": "hybrid"
+      "identityMode": "hybrid",
+      "icon": "cpu"
     },
     {
       "id": "com.gc.backup",
       "name": "Backup",
       "version": "1.2.0",
       "summary": "Scheduled backups of your files to a drive you choose.",
-      "identityMode": "device-only"
+      "identityMode": "device-only",
+      "icon": "database"
     },
     {
       "id": "com.gc.photos",
       "name": "Photos",
       "version": "1.1.0",
       "summary": "Browse and organize your photo library.",
-      "identityMode": "device-only"
+      "identityMode": "device-only",
+      "icon": "photo"
     },
     {
       "id": "com.gc.music",
       "name": "Music",
       "version": "1.0.0",
       "summary": "Play and organize your local music.",
-      "identityMode": "device-only"
+      "identityMode": "device-only",
+      "icon": "music"
     },
     {
       "id": "com.gc.calendar",
       "name": "Calendar",
       "version": "1.0.0",
       "summary": "Your schedule, reminders, and events.",
-      "identityMode": "hybrid"
+      "identityMode": "hybrid",
+      "icon": "calendar"
     }
   ]
 }

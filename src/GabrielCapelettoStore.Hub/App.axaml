@@ -11,6 +11,7 @@
 
     <Application.Resources>
         <conv:AppAccentConverter x:Key="AppAccent" />
+        <conv:AppGlyphConverter x:Key="AppGlyph" />
 
         <!-- Circuit-board design tokens: the hub is a motherboard, apps are chips. -->
         <SolidColorBrush x:Key="BoardBrush" Color="#0B1310" />
@@ -39,10 +40,18 @@
         <SolidColorBrush x:Key="BadgeUpdateTextBrush" Color="#042038" />
 
         <!-- Depth: metallic + glossy gradients -->
+        <!-- Soldermask green, lit from the top-left, sinking to a dark corner. -->
         <LinearGradientBrush x:Key="BoardGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
-            <GradientStop Offset="0" Color="#0F1D15" />
-            <GradientStop Offset="1" Color="#070D0A" />
+            <GradientStop Offset="0" Color="#164A31" />
+            <GradientStop Offset="0.55" Color="#0C2A1C" />
+            <GradientStop Offset="1" Color="#06120C" />
         </LinearGradientBrush>
+        <!-- Vignette: a soft pool of light on the board centre, darker toward the edges. -->
+        <RadialGradientBrush x:Key="BoardVignetteBrush" Center="50%,34%" GradientOrigin="50%,34%" RadiusX="75%" RadiusY="75%">
+            <GradientStop Offset="0" Color="#2213C77E" />
+            <GradientStop Offset="0.6" Color="#00000000" />
+            <GradientStop Offset="1" Color="#73030A06" />
+        </RadialGradientBrush>
         <LinearGradientBrush x:Key="CopperMetalBrush" StartPoint="0%,0%" EndPoint="0%,100%">
             <GradientStop Offset="0" Color="#F0D18F" />
             <GradientStop Offset="0.5" Color="#B0894F" />

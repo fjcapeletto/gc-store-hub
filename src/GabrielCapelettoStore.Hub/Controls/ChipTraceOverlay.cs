@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace GabrielCapelettoStore.Hub.Controls;
 
@@ -13,6 +15,7 @@ namespace GabrielCapelettoStore.Hub.Controls;
 ///    clear column boundary (never over the name/button), then 45-degrees into the pins of
 ///    the app diagonally below — Weather↘Calendar, and symmetrically Notes↙Music;
 ///  - a NODE (thick dot) where the ↘ and ↙ traces cross.
+/// A faint "current" of light travels the copper (animated dash) so the board reads as live.
 /// Sized to match the items grid; recomputes on resize.
 /// </summary>
 public sealed class ChipTraceOverlay : Control
@@ -33,6 +36,31 @@ public sealed class ChipTraceOverlay : Control
     private const double PinGap = 9;        // spacing between the 3 pins
     private const double Lead = 20;         // 45-degree diagonal lead-out length
     private const double Drop = 136;        // vertical segment length (keeps the corners 45°)
+
+    private readonly DispatcherTimer _timer;
+    private double _phase;                  // animated dash offset → the flowing current
+
+    public ChipTraceOverlay()
+    {
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        _timer.Tick += (_, _) =>
+        {
+            _phase -= 1.4;                  // negative → current flows pin-to-pin outward
+            InvalidateVisual();
+        };
+    }
+
+    protected override void OnAttachedToVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _timer.Start();
+    }
+
+    protected override void OnDetachedFromVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _timer.Stop();
+    }
 
     static ChipTraceOverlay()
     {
@@ -58,12 +86,22 @@ public sealed class ChipTraceOverlay : Control
         }
 
         var cols = Math.Max(1, (int)(w / CellW));
-        var pen = new Pen(new SolidColorBrush(Color.FromRgb(0xB0, 0x89, 0x4F), 0.85), 2)
+        var copper = new Pen(new SolidColorBrush(Color.FromRgb(0xC9, 0x9C, 0x59), 0.9), 2)
         {
             LineJoin = PenLineJoin.Round,
             LineCap = PenLineCap.Round,
         };
+        // Bright travelling pulse: short "on" segments spaced far apart, offset animated per frame.
+        var spark = new Pen(new SolidColorBrush(Color.FromRgb(0x6C, 0xF2, 0xC0), 0.9), 2)
+        {
+            LineJoin = PenLineJoin.Round,
+            LineCap = PenLineCap.Round,
+            DashStyle = new DashStyle(new double[] { 1.4, 22 }, _phase),
+        };
         var node = new SolidColorBrush(Color.FromRgb(0xD8, 0xAE, 0x6E), 0.95);
+
+        // Collect every trace as a geometry, then stroke copper first and the spark on top.
+        var traces = new List<Geometry>();
 
         for (var i = 0; i < count; i++)
         {
@@ -78,7 +116,7 @@ public sealed class ChipTraceOverlay : Control
                 for (var k = -1; k <= 1; k++)
                 {
                     var y = cy + k * PinGap;
-                    context.DrawLine(pen, new Point(cx + PinReach, y), new Point(ncx - PinReach, y));
+                    traces.Add(Line(new Point(cx + PinReach, y), new Point(ncx - PinReach, y)));
                 }
             }
 
@@ -91,7 +129,7 @@ public sealed class ChipTraceOverlay : Control
                 for (var k = -1; k <= 1; k++)
                 {
                     var vx = cx + (PinReach + Lead) + PinGap * k; // parallel vertical, spaced with the pins
-                    context.DrawGeometry(null, pen, Stair(
+                    traces.Add(Stair(
                         new Point(cx + PinReach, cy + k * PinGap),
                         new Point(vx, cy + Lead + 2 * PinGap * k),
                         new Point(vx, cy + Lead + Drop + 2 * PinGap * k),
@@ -106,20 +144,45 @@ public sealed class ChipTraceOverlay : Control
                 for (var k = -1; k <= 1; k++)
                 {
                     var vx = cx - (PinReach + Lead) - PinGap * k;
-                    context.DrawGeometry(null, pen, Stair(
+                    traces.Add(Stair(
                         new Point(cx - PinReach, cy + k * PinGap),
                         new Point(vx, cy + Lead + 2 * PinGap * k),
                         new Point(vx, cy + Lead + Drop + 2 * PinGap * k),
                         new Point(cx - CellW + PinReach, bcy + k * PinGap)));
                 }
             }
+        }
 
-            // Node where ↘ and ↙ cross (unifilar junction) — centre of the 2x2 block.
-            if (hasDownRight)
+        foreach (var geo in traces)
+        {
+            context.DrawGeometry(null, copper, geo);
+        }
+
+        foreach (var geo in traces)
+        {
+            context.DrawGeometry(null, spark, geo);
+        }
+
+        // Nodes where ↘ and ↙ traces cross (unifilar junctions) — drawn last, over the copper.
+        for (var i = 0; i < count; i++)
+        {
+            var col = i % cols;
+            var cy = i / cols * CellH + ChipCenterY;
+            if (col < cols - 1 && i + cols + 1 < count)
             {
                 context.DrawEllipse(node, null, new Point(col * CellW + CellW, cy + CellH - 30), 4.5, 4.5);
             }
         }
+    }
+
+    private static StreamGeometry Line(Point a, Point b)
+    {
+        var geo = new StreamGeometry();
+        using var ctx = geo.Open();
+        ctx.BeginFigure(a, false);
+        ctx.LineTo(b);
+        ctx.EndFigure(false);
+        return geo;
     }
 
     private static StreamGeometry Stair(Point a, Point b, Point c, Point d)

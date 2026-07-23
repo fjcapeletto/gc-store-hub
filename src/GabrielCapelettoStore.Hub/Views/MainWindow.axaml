@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
         x:Class="GabrielCapelettoStore.Hub.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/gcstore.ico"
         Width="900" Height="600"
         MinWidth="640" MinHeight="420"
         Background="{StaticResource BoardGradientBrush}"
@@ -62,9 +62,23 @@
             <Setter Property="CornerRadius" Value="2" />
             <Setter Property="Background" Value="{StaticResource CopperMetalBrush}" />
         </Style>
+
+        <!-- Online LED breathes; the board is live. -->
+        <Style Selector="Border.ledPulse">
+            <Style.Animations>
+                <Animation Duration="0:0:2.4" IterationCount="INFINITE" Easing="SineEaseInOut">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.45" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </Window.Styles>
 
     <Panel>
+
+        <!-- Board vignette: pool of light in the centre, darkened edges (depth). -->
+        <Border Background="{StaticResource BoardVignetteBrush}" IsHitTestVisible="False" ZIndex="-2" />
 
         <!-- ================= CATALOG ================= -->
         <Grid IsVisible="{Binding !ShowSettings}" RowDefinitions="Auto,Auto,*" Margin="24,20">
@@ -89,7 +103,7 @@
                     <!-- Board LED: green = online, red = offline -->
                     <Panel Width="30" VerticalAlignment="Center" ToolTip.Tip="{Binding ConnectivityLabel}">
                         <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedGreenBrush}"
-                                BoxShadow="0 0 8 0 #8027E08A" IsVisible="{Binding IsOnline}"
+                                Classes="ledPulse" BoxShadow="0 0 8 0 #8027E08A" IsVisible="{Binding IsOnline}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedRedBrush}"
                                 BoxShadow="0 0 8 0 #80E24B4A" IsVisible="{Binding !IsOnline}"
@@ -175,9 +189,10 @@
                                                         <Border Width="60" Height="60" CornerRadius="11"
                                                                 Background="{StaticResource DieGlowBrush}"
                                                                 BorderBrush="{StaticResource CopperDimBrush}" BorderThickness="1">
-                                                            <TextBlock Text="{Binding Initial}" FontSize="28" FontWeight="SemiBold"
-                                                                       Foreground="{Binding Id, Converter={StaticResource AppAccent}}"
-                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            <Path Data="{Binding App.Icon, Converter={StaticResource AppGlyph}}"
+                                                                  Fill="{Binding Id, Converter={StaticResource AppAccent}}"
+                                                                  Stretch="Uniform" Width="34" Height="34"
+                                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                         </Border>
                                                         <Border VerticalAlignment="Top" Height="3" Margin="10,1,10,0"
                                                                 CornerRadius="2" Background="#26FFFFFF" />
