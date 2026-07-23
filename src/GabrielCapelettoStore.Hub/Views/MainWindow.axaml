@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:GabrielCapelettoStore.Hub.ViewModels"
         xmlns:identity="using:GabrielCapelettoStore.Hub.Identity"
+        xmlns:controls="using:GabrielCapelettoStore.Hub.Controls"
         xmlns:sys="using:System"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -11,57 +12,104 @@
         Icon="/Assets/avalonia-logo.ico"
         Width="900" Height="600"
         MinWidth="640" MinHeight="420"
+        Background="{StaticResource BoardGradientBrush}"
         Title="Gabriel Capeletto Store">
 
     <Design.DataContext>
-        <!-- Design-time only; real DataContext is set in App.axaml.cs -->
         <vm:MainViewModel />
     </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="Button.icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource SilkDimBrush}" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="FontSize" Value="18" />
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#14FFFFFF" />
+            <Setter Property="TextElement.Foreground" Value="{StaticResource SilkBrush}" />
+        </Style>
+
+        <Style Selector="Button.pill">
+            <Setter Property="Background" Value="#22B0894F" />
+            <Setter Property="BorderBrush" Value="#73B0894F" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource LedAmberBrush}" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="16,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.pill:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#38B0894F" />
+            <Setter Property="BorderBrush" Value="#A0B0894F" />
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.38" />
+        </Style>
+
+        <Style Selector="Border.legH">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Background" Value="{StaticResource CopperMetalBrush}" />
+        </Style>
+        <Style Selector="Border.legV">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Background" Value="{StaticResource CopperMetalBrush}" />
+        </Style>
+    </Window.Styles>
 
     <Panel>
 
         <!-- ================= CATALOG ================= -->
-        <Grid IsVisible="{Binding !ShowSettings}" RowDefinitions="Auto,Auto,*" Margin="24">
+        <Grid IsVisible="{Binding !ShowSettings}" RowDefinitions="Auto,Auto,*" Margin="24,20">
 
             <!-- Header -->
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding StoreName}" FontSize="26" FontWeight="SemiBold" />
-                    <TextBlock Text="Your device's software store" FontSize="13" Opacity="0.55" />
+                    <TextBlock Text="{Binding StoreName}" FontSize="24" FontWeight="SemiBold"
+                               Foreground="{StaticResource SilkBrush}" />
+                    <TextBlock Text="your device's software store" FontSize="12"
+                               Foreground="{StaticResource SilkMutedBrush}"
+                               FontFamily="Cascadia Mono,Consolas,monospace" />
                     <TextBlock Text="{Binding OfflineNotice}" IsVisible="{Binding ShowOfflineNotice}"
-                               FontSize="12" Foreground="#B58900" Margin="0,2,0,0" />
+                               FontSize="12" Foreground="{StaticResource LedAmberBrush}" Margin="0,3,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <TextBlock Text="{Binding SyncStatus}" IsVisible="{Binding HasSyncStatus}"
-                               FontSize="12" Opacity="0.6" VerticalAlignment="Center" Margin="0,0,4,0" />
-                    <Button Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
-                            ToolTip.Tip="Check for updates"
-                            Background="Transparent" BorderThickness="0" Padding="6"
-                            FontSize="18" Content="⟳" />
-                    <!-- Connectivity LED: green = store online, red = offline -->
+                               FontSize="12" Foreground="{StaticResource SilkMutedBrush}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button Classes="icon" Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
+                            ToolTip.Tip="Check for updates" Content="⟳" />
+                    <!-- Board LED: green = online, red = offline -->
                     <Panel Width="30" VerticalAlignment="Center" ToolTip.Tip="{Binding ConnectivityLabel}">
-                        <Ellipse Width="11" Height="11" Fill="#2E9E44" IsVisible="{Binding IsOnline}" />
-                        <Ellipse Width="11" Height="11" Fill="#D64545" IsVisible="{Binding !IsOnline}" />
+                        <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedGreenBrush}"
+                                BoxShadow="0 0 8 0 #8027E08A" IsVisible="{Binding IsOnline}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedRedBrush}"
+                                BoxShadow="0 0 8 0 #80E24B4A" IsVisible="{Binding !IsOnline}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Panel>
-                    <Button Command="{Binding OpenSettingsCommand}"
-                            ToolTip.Tip="Settings"
-                            Background="Transparent" BorderThickness="0" Padding="6"
-                            FontSize="18" Content="⚙" />
+                    <Button Classes="icon" Command="{Binding OpenSettingsCommand}"
+                            ToolTip.Tip="Settings" Content="⚙" />
                 </StackPanel>
             </Grid>
 
             <!-- Session greeting -->
             <Border Grid.Row="1" IsVisible="{Binding HasNews}"
-                    Margin="0,0,0,14" Padding="12,8" CornerRadius="6"
-                    Background="#1F4CAF50" BorderBrush="#664CAF50" BorderThickness="1">
+                    Margin="0,0,0,14" Padding="12,8" CornerRadius="8"
+                    Background="#14231A" BorderBrush="#2E5A3E" BorderThickness="1">
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0" VerticalAlignment="Center"
-                               Text="{Binding NewsSummary, StringFormat='✨  {0} since your last visit'}"
-                               FontSize="13" FontWeight="SemiBold" />
-                    <Button Grid.Column="1" Command="{Binding DismissBannerCommand}"
-                            ToolTip.Tip="Dismiss"
-                            Background="Transparent" BorderThickness="0" Padding="6,2"
-                            FontSize="13" Content="✕" />
+                               Text="{Binding NewsSummary, StringFormat='✦  {0} since your last visit'}"
+                               FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource SilkBrush}" />
+                    <Button Grid.Column="1" Classes="icon" Command="{Binding DismissBannerCommand}"
+                            ToolTip.Tip="Dismiss" FontSize="13" Content="✕" />
                 </Grid>
             </Border>
 
@@ -71,125 +119,168 @@
                 <StackPanel IsVisible="{Binding IsLoading}"
                             HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                     <ProgressBar IsIndeterminate="True" Width="220" />
-                    <TextBlock Text="Loading catalog…" HorizontalAlignment="Center" Opacity="0.6" />
+                    <TextBlock Text="Loading catalog…" HorizontalAlignment="Center"
+                               Foreground="{StaticResource SilkMutedBrush}" />
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding HasError}" MaxWidth="440"
                             HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                     <TextBlock Text="Store unavailable" FontSize="18" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" />
+                               HorizontalAlignment="Center" Foreground="{StaticResource SilkBrush}" />
                     <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
-                               TextAlignment="Center" Opacity="0.6" />
-                    <Button Content="Try again" Command="{Binding SyncCommand}"
+                               TextAlignment="Center" Foreground="{StaticResource SilkMutedBrush}" />
+                    <Button Classes="pill" Content="Try again" Command="{Binding SyncCommand}"
                             HorizontalAlignment="Center" />
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding ShowEmptyState}"
                             HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                    <TextBlock Text="The shelves are empty — for now."
-                               FontSize="16" Opacity="0.6" HorizontalAlignment="Center" />
-                    <TextBlock Text="New apps will appear here automatically."
-                               FontSize="12" Opacity="0.4" HorizontalAlignment="Center" />
+                    <TextBlock Text="The board is bare — for now."
+                               FontSize="16" Foreground="{StaticResource SilkDimBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="New chips will appear here automatically."
+                               FontSize="12" Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center" />
                 </StackPanel>
 
                 <ScrollViewer IsVisible="{Binding ShowCatalog}">
-                    <ItemsControl ItemsSource="{Binding Apps}">
+                    <Grid HorizontalAlignment="Left">
+                        <controls:ChipTraceOverlay ItemCount="{Binding Apps.Count}" ZIndex="-1"
+                                                   IsHitTestVisible="False"
+                                                   Width="{Binding #Items.Bounds.Width}"
+                                                   Height="{Binding #Items.Bounds.Height}" />
+                        <ItemsControl x:Name="Items" ItemsSource="{Binding Apps}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ShelfItemViewModel">
-                                <Border Margin="0,0,0,10" Padding="16" CornerRadius="8"
-                                        Background="#11808080"
-                                        BorderThickness="1" BorderBrush="#33808080">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0" Spacing="6">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding Name}" FontSize="16"
-                                                           FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <Border IsVisible="{Binding IsNew}" VerticalAlignment="Center"
-                                                        Background="#2E7D32" CornerRadius="4" Padding="6,2">
-                                                    <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
-                                                               Foreground="White" />
+                                <Border Width="150" Height="196" Margin="0" Padding="6,10" CornerRadius="12">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <Panel Width="110" Height="104">
+                                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto">
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="9"
+                                                            HorizontalAlignment="Center" Margin="0,0,0,-3">
+                                                    <Border Classes="legV" /><Border Classes="legV" /><Border Classes="legV" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="9"
+                                                            VerticalAlignment="Center" Margin="0,0,-3,0">
+                                                    <Border Classes="legH" /><Border Classes="legH" /><Border Classes="legH" />
+                                                </StackPanel>
+                                                <Border Grid.Row="1" Grid.Column="1" Width="72" Height="72" CornerRadius="15"
+                                                        Background="{StaticResource ChipCapBrush}" BorderBrush="#3C5044"
+                                                        BorderThickness="1.5" BoxShadow="0 5 12 0 #7A000000" Padding="4">
+                                                    <Panel>
+                                                        <Border Width="60" Height="60" CornerRadius="11"
+                                                                Background="{StaticResource DieGlowBrush}"
+                                                                BorderBrush="{StaticResource CopperDimBrush}" BorderThickness="1">
+                                                            <TextBlock Text="{Binding Initial}" FontSize="28" FontWeight="SemiBold"
+                                                                       Foreground="{Binding Id, Converter={StaticResource AppAccent}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <Border VerticalAlignment="Top" Height="3" Margin="10,1,10,0"
+                                                                CornerRadius="2" Background="#26FFFFFF" />
+                                                        <Ellipse Width="4" Height="4" Fill="{StaticResource CopperBrush}"
+                                                                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1,1,0,0" />
+                                                    </Panel>
                                                 </Border>
-                                                <Border IsVisible="{Binding IsUpdated}" VerticalAlignment="Center"
-                                                        Background="#1565C0" CornerRadius="4" Padding="6,2">
-                                                    <TextBlock Text="UPDATE" FontSize="10" FontWeight="Bold"
-                                                               Foreground="White" />
-                                                </Border>
-                                            </StackPanel>
-                                            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
-                                                       FontSize="13" Opacity="0.7" />
-                                            <TextBlock Text="{Binding VersionSubline}" FontSize="12" Opacity="0.55" />
-                                            <Border HorizontalAlignment="Left" CornerRadius="4"
-                                                    Padding="6,2" Background="#22808080">
-                                                <TextBlock Text="{Binding IdentityMode}" FontSize="11" Opacity="0.7" />
+                                                <StackPanel Grid.Row="1" Grid.Column="2" Spacing="9"
+                                                            VerticalAlignment="Center" Margin="-3,0,0,0">
+                                                    <Border Classes="legH" /><Border Classes="legH" /><Border Classes="legH" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="9"
+                                                            HorizontalAlignment="Center" Margin="0,-3,0,0">
+                                                    <Border Classes="legV" /><Border Classes="legV" /><Border Classes="legV" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <Border IsVisible="{Binding IsNew}" Background="{StaticResource BadgeNewBrush}"
+                                                    CornerRadius="6" Padding="5,1" HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top" Margin="0,0,4,0">
+                                                <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
+                                                           Foreground="{StaticResource BadgeNewTextBrush}" />
                                             </Border>
-                                        </StackPanel>
-                                        <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="92"
-                                                Content="{Binding InstallButtonText}"
-                                                Command="{Binding InstallCommand}"
-                                                IsEnabled="{Binding CanInstall}" />
-                                    </Grid>
+                                            <Border IsVisible="{Binding IsUpdated}" Background="{StaticResource BadgeUpdateBrush}"
+                                                    CornerRadius="6" Padding="5,1" HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top" Margin="0,0,4,0">
+                                                <TextBlock Text="UPD" FontSize="10" FontWeight="Bold"
+                                                           Foreground="{StaticResource BadgeUpdateTextBrush}" />
+                                            </Border>
+                                        </Panel>
+
+                                        <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource SilkBrush}"
+                                                   HorizontalAlignment="Center" Margin="0,9,0,0" MaxWidth="126"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding VersionSubline}" FontSize="11"
+                                                   Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center"
+                                                   Margin="0,1,0,0" MaxWidth="126" TextTrimming="CharacterEllipsis" />
+                                        <Button Classes="pill" Content="{Binding InstallButtonText}"
+                                                Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
+                                                Margin="0,8,0,0" />
+                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ItemsControl>
+                    </Grid>
                 </ScrollViewer>
 
             </Panel>
         </Grid>
 
         <!-- ================= SETTINGS ================= -->
-        <Grid IsVisible="{Binding ShowSettings}" RowDefinitions="Auto,*" Margin="24">
+        <Grid IsVisible="{Binding ShowSettings}" RowDefinitions="Auto,*" Margin="24,20">
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
-                <Button Command="{Binding CloseSettingsCommand}"
-                        ToolTip.Tip="Back"
-                        Background="Transparent" BorderThickness="0" Padding="6"
-                        FontSize="18" Content="←" />
-                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Button Classes="icon" Command="{Binding CloseSettingsCommand}" ToolTip.Tip="Back" Content="←" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"
+                           Foreground="{StaticResource SilkBrush}" />
             </StackPanel>
 
             <ScrollViewer Grid.Row="1">
                 <StackPanel Spacing="12" MaxWidth="620" HorizontalAlignment="Left">
 
-                    <!-- Verdict -->
-                    <Border CornerRadius="8" Background="#11808080"
-                            BorderThickness="1" BorderBrush="#33808080" Padding="16">
+                    <Border CornerRadius="10" Background="{StaticResource BoardPanelBrush}"
+                            BorderThickness="1" BorderBrush="{StaticResource BoardBorderBrush}" Padding="16">
                         <StackPanel Spacing="4">
                             <TextBlock Text="{Binding DeviceIdentity.VerdictHeadline}"
-                                       FontSize="16" FontWeight="SemiBold" />
+                                       FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource SilkBrush}" />
                             <TextBlock Text="{Binding DeviceIdentity.VerdictDetail}"
-                                       Opacity="0.7" FontSize="13" TextWrapping="Wrap" />
+                                       Foreground="{StaticResource SilkDimBrush}" FontSize="13" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 
-                    <!-- Anomalies -->
                     <ItemsControl ItemsSource="{Binding DeviceIdentity.Anomalies}"
                                   IsVisible="{Binding DeviceIdentity.HasAnomalies}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="sys:String">
-                                <TextBlock Text="{Binding}" FontSize="12" Foreground="#B58900"
+                                <TextBlock Text="{Binding}" FontSize="12" Foreground="{StaticResource LedAmberBrush}"
                                            TextWrapping="Wrap" Margin="0,2" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Text="This device" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    <TextBlock Text="This device" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0"
+                               Foreground="{StaticResource SilkBrush}" />
 
-                    <Border CornerRadius="8" Background="#11808080"
-                            BorderThickness="1" BorderBrush="#33808080" Padding="4,8">
+                    <Border CornerRadius="10" Background="{StaticResource BoardPanelBrush}"
+                            BorderThickness="1" BorderBrush="{StaticResource BoardBorderBrush}" Padding="4,8">
                         <ItemsControl ItemsSource="{Binding DeviceIdentity.Signals}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="identity:SignalRow">
                                     <Grid ColumnDefinitions="190,*,Auto" Margin="12,6">
                                         <TextBlock Grid.Column="0" Text="{Binding Label}"
-                                                   FontSize="13" Opacity="0.6" VerticalAlignment="Center" />
+                                                   FontSize="13" Foreground="{StaticResource SilkMutedBrush}"
+                                                   VerticalAlignment="Center" />
                                         <SelectableTextBlock Grid.Column="1" Text="{Binding Value}"
                                                              FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"
+                                                             Foreground="{StaticResource SilkBrush}"
                                                              FontFamily="Cascadia Mono,Consolas,monospace" />
                                         <Border Grid.Column="2" IsVisible="{Binding !IsDistinctive}"
                                                 VerticalAlignment="Center" Margin="8,0,0,0"
-                                                Background="#33B58900" CornerRadius="4" Padding="6,2">
-                                            <TextBlock Text="shared default" FontSize="10" Foreground="#B58900" />
+                                                Background="#2EB0894F" CornerRadius="4" Padding="6,2">
+                                            <TextBlock Text="shared default" FontSize="10"
+                                                       Foreground="{StaticResource LedAmberBrush}" />
                                         </Border>
                                     </Grid>
                                 </DataTemplate>
@@ -197,15 +288,14 @@
                         </ItemsControl>
                     </Border>
 
-                    <TextBlock TextWrapping="Wrap" FontSize="12" Opacity="0.5"
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SilkMutedBrush}"
                                Text="These are the hardware signals used to recognize this device. They are readable by any local tool — none is a secret, and none is your license key." />
 
-                    <Button Content="Copy diagnostics" Click="OnCopyDiagnostics" HorizontalAlignment="Left" />
+                    <Button Classes="pill" Content="Copy diagnostics" Click="OnCopyDiagnostics" HorizontalAlignment="Left" />
 
-                    <!-- Dev-only scoring diagnostics (Debug builds) -->
                     <TextBlock Text="{Binding DeviceIdentity.DiagnosticsLine}"
                                IsVisible="{Binding DeviceIdentity.ShowDiagnostics}"
-                               FontSize="11" Opacity="0.45" TextWrapping="Wrap"
+                               FontSize="11" Foreground="{StaticResource SilkMutedBrush}" TextWrapping="Wrap"
                                FontFamily="Cascadia Mono,Consolas,monospace" Margin="0,8,0,0" />
 
                 </StackPanel>

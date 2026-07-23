@@ -34,6 +34,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public CatalogApp App { get; }
     public string Id => App.Id;
     public string Name => App.Name;
+
+    /// <summary>Placeholder inner identity until apps ship real icons — the app's first letter.</summary>
+    public string Initial => string.IsNullOrWhiteSpace(Name) ? "?" : Name.Trim()[..1].ToUpperInvariant();
     public string? Summary => App.Summary;
     public AppIdentityMode IdentityMode => App.IdentityMode;
 

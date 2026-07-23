@@ -2,12 +2,62 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="GabrielCapelettoStore.Hub.App"
              xmlns:local="using:GabrielCapelettoStore.Hub"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             xmlns:conv="using:GabrielCapelettoStore.Hub.Converters"
+             RequestedThemeVariant="Dark">
 
     <Application.DataTemplates>
         <local:ViewLocator />
     </Application.DataTemplates>
+
+    <Application.Resources>
+        <conv:AppAccentConverter x:Key="AppAccent" />
+
+        <!-- Circuit-board design tokens: the hub is a motherboard, apps are chips. -->
+        <SolidColorBrush x:Key="BoardBrush" Color="#0B1310" />
+        <SolidColorBrush x:Key="BoardPanelBrush" Color="#101A15" />
+        <SolidColorBrush x:Key="BoardBorderBrush" Color="#223026" />
+
+        <SolidColorBrush x:Key="CopperBrush" Color="#B0894F" />
+        <SolidColorBrush x:Key="CopperDimBrush" Color="#6E5636" />
+        <SolidColorBrush x:Key="TraceBrush" Color="#2A5A3E" />
+
+        <SolidColorBrush x:Key="ChipBodyBrush" Color="#18251E" />
+        <SolidColorBrush x:Key="ChipBevelBrush" Color="#223229" />
+        <SolidColorBrush x:Key="ChipBorderBrush" Color="#33473A" />
+
+        <SolidColorBrush x:Key="SilkBrush" Color="#EAF1EC" />
+        <SolidColorBrush x:Key="SilkDimBrush" Color="#9DB3A6" />
+        <SolidColorBrush x:Key="SilkMutedBrush" Color="#7E9686" />
+
+        <SolidColorBrush x:Key="LedGreenBrush" Color="#27E08A" />
+        <SolidColorBrush x:Key="LedRedBrush" Color="#E24B4A" />
+        <SolidColorBrush x:Key="LedAmberBrush" Color="#E4BD84" />
+
+        <SolidColorBrush x:Key="BadgeNewBrush" Color="#27E08A" />
+        <SolidColorBrush x:Key="BadgeNewTextBrush" Color="#04231A" />
+        <SolidColorBrush x:Key="BadgeUpdateBrush" Color="#5AB0FF" />
+        <SolidColorBrush x:Key="BadgeUpdateTextBrush" Color="#042038" />
+
+        <!-- Depth: metallic + glossy gradients -->
+        <LinearGradientBrush x:Key="BoardGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Offset="0" Color="#0F1D15" />
+            <GradientStop Offset="1" Color="#070D0A" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="CopperMetalBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#F0D18F" />
+            <GradientStop Offset="0.5" Color="#B0894F" />
+            <GradientStop Offset="1" Color="#6E4F28" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="ChipCapBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#2C3E33" />
+            <GradientStop Offset="0.45" Color="#18251E" />
+            <GradientStop Offset="1" Color="#0E1712" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="DieGlowBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#16324A" />
+            <GradientStop Offset="1" Color="#0A130F" />
+        </LinearGradientBrush>
+    </Application.Resources>
 
     <Application.Styles>
         <FluentTheme />
