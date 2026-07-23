@@ -103,9 +103,15 @@
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StoreName}" FontSize="24" FontWeight="SemiBold"
                                Foreground="{StaticResource SilkBrush}" />
-                    <TextBlock Text="your device's software store" FontSize="12"
-                               Foreground="{StaticResource SilkMutedBrush}"
-                               FontFamily="Cascadia Mono,Consolas,monospace" />
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <TextBlock Text="your device's software store" FontSize="12"
+                                   Foreground="{StaticResource SilkMutedBrush}"
+                                   FontFamily="Cascadia Mono,Consolas,monospace" />
+                        <TextBlock Text="{Binding HubVersion}" FontSize="12"
+                                   Foreground="{StaticResource CopperBrush}"
+                                   FontFamily="Cascadia Mono,Consolas,monospace"
+                                   ToolTip.Tip="Installed hub version" />
+                    </StackPanel>
                     <TextBlock Text="{Binding OfflineNotice}" IsVisible="{Binding ShowOfflineNotice}"
                                FontSize="12" Foreground="{StaticResource LedAmberBrush}" Margin="0,3,0,0" />
                 </StackPanel>

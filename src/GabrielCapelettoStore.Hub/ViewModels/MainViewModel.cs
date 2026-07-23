@@ -56,6 +56,15 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StoreName { get; set; } = "Gabriel Capeletto Store";
 
+    /// <summary>The running hub version (stamped at build time; shown in the header).</summary>
+    public string HubVersion { get; } = ResolveVersion();
+
+    private static string ResolveVersion()
+    {
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        return v is null ? "dev" : $"v{v.Major}.{v.Minor}.{v.Build}";
+    }
+
     /// <summary>The "This device" identity section shown in Settings.</summary>
     public DeviceIdentityViewModel DeviceIdentity { get; }
 

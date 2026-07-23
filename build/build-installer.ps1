@@ -27,7 +27,7 @@ $releases  = Join-Path $root "artifacts/releases"
 if (Test-Path $publish) { Remove-Item -Recurse -Force $publish }
 
 Write-Host "==> Publishing (self-contained win-x64)..." -ForegroundColor Cyan
-dotnet publish $project -c Release -r win-x64 --self-contained true -o $publish
+dotnet publish $project -c Release -r win-x64 --self-contained true -o $publish -p:Version=$Version
 
 Write-Host "==> Packing with Velopack (v$Version)..." -ForegroundColor Cyan
 vpk pack `

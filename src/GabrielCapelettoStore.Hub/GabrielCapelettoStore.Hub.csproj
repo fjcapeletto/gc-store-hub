@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\gcstore.ico</ApplicationIcon>
+    <!-- Dev default; CI / build-installer override with the release tag via -p:Version=X.Y.Z -->
+    <Version>0.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
