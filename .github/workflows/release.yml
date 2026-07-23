@@ -1,0 +1,68 @@
+name: Release
+
+# Cut a release by pushing a version tag:  git tag v1.0.1 && git push origin v1.0.1
+# This builds the self-contained hub, packages it with Velopack (computing a delta
+# against the previous release), and publishes the installer + update feed to this
+# repo's GitHub Releases. The installed hub reads that feed and self-updates.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create/publish GitHub Releases
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Derive version from tag
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish src/GabrielCapelettoStore.Hub/GabrielCapelettoStore.Hub.csproj
+          -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Download previous release (enables delta updates)
+        continue-on-error: true
+        run: vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o Releases
+
+      - name: Pack installer + feed
+        run: >
+          vpk pack
+          -u GabrielCapelettoStoreHub
+          -v ${{ steps.ver.outputs.version }}
+          -p publish
+          -e GabrielCapelettoStore.Hub.exe
+          --packTitle "Gabriel Capeletto Store"
+          --packAuthors "GabrielCapeletto LLC"
+          --icon src/GabrielCapelettoStore.Hub/Assets/gcstore.ico
+          -o Releases
+
+      - name: Publish to GitHub Releases
+        run: >
+          vpk upload github
+          --repoUrl https://github.com/${{ github.repository }}
+          --token ${{ secrets.GITHUB_TOKEN }}
+          --publish
+          --releaseName "GC Store ${{ steps.ver.outputs.version }}"
+          --tag ${{ github.ref_name }}
+          -o Releases
+
+# --- Code signing (optional, recommended for production) ---
+# Unsigned installers trip SmartScreen. To sign, add an Authenticode cert as a secret
+# and pass it to `vpk pack`, e.g.:
+#   --signParams "/fd sha256 /f cert.pfx /p ${{ secrets.CERT_PASSWORD }} /tr http://timestamp.digicert.com /td sha256"
+# The signing key belongs in GitHub Actions secrets — never committed to the repo.

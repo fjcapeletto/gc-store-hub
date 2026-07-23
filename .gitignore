@@ -10,6 +10,8 @@
 [Ll]og/
 [Ll]ogs/
 artifacts/
+publish/
+[Rr]eleases/
 
 # Visual Studio / Rider / VS Code
 .vs/

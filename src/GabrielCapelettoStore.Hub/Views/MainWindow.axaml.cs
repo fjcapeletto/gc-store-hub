@@ -21,6 +21,10 @@ public partial class MainWindow : Window
     private DispatcherTimer? _refreshTimer;
     private DateTime _lastActivateRefreshUtc = DateTime.MinValue;
 
+    /// <summary>When false, closing the window hides it to the tray instead of exiting.
+    /// The tray's Quit sets this true so the app can actually shut down.</summary>
+    public bool AllowClose { get; set; }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -28,6 +32,18 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Activated += OnActivated;
         Closed += OnClosed;
+    }
+
+    // Close (the window X) hides to the tray; the app keeps running there until Quit.
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!AllowClose)
+        {
+            e.Cancel = true;
+            Hide();
+        }
+
+        base.OnClosing(e);
     }
 
     private MainViewModel? ViewModel => DataContext as MainViewModel;
