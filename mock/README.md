@@ -4,7 +4,10 @@ Sample catalog documents used to exercise the distribution pipeline while the re
 backend does not exist yet. The hub fetches whatever URL is set in
 `Catalog:Url` (see `src/GabrielCapelettoStore.Hub/appsettings.json`).
 
-- `catalog.json` — several sample apps → the hub shows populated shelves.
+- `catalog.json` — several sample apps, `access: granted` → populated, installable shelves.
+- `catalog.locked.json` — same apps, `access: locked` + `offer` → apps visible but
+  **locked/opaque** with an *Unlock* CTA (the sales hook). Weather carries a per-app
+  `install: installable` override to demo the hybrid resolution rule.
 - `catalog.empty.json` — no apps → the empty-*catalog* state (a granted device
   with nothing published yet). Distinct from the locked state, where apps are
   visible but not installable — see [`contract/`](../contract/).

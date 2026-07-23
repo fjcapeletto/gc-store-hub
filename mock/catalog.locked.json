@@ -1,6 +1,13 @@
 {
   "catalogVersion": 1,
-  "access": { "state": "granted" },
+  "access": {
+    "state": "locked",
+    "reason": "no-store-access",
+    "offer": {
+      "headline": "Unlock the Gabriel Capeletto Store",
+      "actionUrl": "https://github.com/fjcapeletto/gc-store-hub"
+    }
+  },
   "apps": [
     {
       "id": "com.gc.weather",
@@ -8,7 +15,8 @@
       "version": "1.3.0",
       "summary": "Local forecast at a glance.",
       "identityMode": "device-only",
-      "icon": "cloud"
+      "icon": "cloud",
+      "install": { "state": "installable" }
     },
     {
       "id": "com.gc.notes",

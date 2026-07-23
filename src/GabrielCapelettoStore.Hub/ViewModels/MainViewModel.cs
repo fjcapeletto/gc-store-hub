@@ -244,9 +244,12 @@ public partial class MainViewModel : ViewModelBase
 
         var dismissedAt = _observation.BannerDismissedAt ?? DateTimeOffset.MinValue;
 
+        var access = _manifest.Access;
+
         var items = new List<ShelfItemViewModel>(_manifest.Apps.Count);
         var signature = new StringBuilder();
         signature.Append(IsOnline ? "on;" : "off;");
+        signature.Append((int)access.State).Append(';');
         var newCount = 0;
         var updatedCount = 0;
 
@@ -287,9 +290,12 @@ public partial class MainViewModel : ViewModelBase
                 }
             }
 
-            items.Add(new ShelfItemViewModel(app, installedVersion, updateAvailable, status, IsOnline, InstallApp));
+            var item = new ShelfItemViewModel(
+                app, installedVersion, updateAvailable, status, IsOnline, InstallApp, access, OpenOffer);
+            items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
-                     .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append(';');
+                     .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')
+                     .Append(item.IsLocked ? 'L' : '_').Append(';');
         }
 
         AppCount = items.Count;
@@ -309,6 +315,19 @@ public partial class MainViewModel : ViewModelBase
         foreach (var item in items)
         {
             Apps.Add(item);
+        }
+    }
+
+    /// <summary>Opens the offer landing (buy store access) in the user's default browser.</summary>
+    private void OpenOffer(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            // A bad/unreachable offer URL must never crash the hub; the CTA is best-effort.
         }
     }
 

@@ -50,6 +50,21 @@
             <Setter Property="Opacity" Value="0.38" />
         </Style>
 
+        <!-- Locked apps: the sales hook replaces the install pill. -->
+        <Style Selector="Button.unlock">
+            <Setter Property="Background" Value="{StaticResource LedAmberBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#221706" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="14,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.unlock:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#F6D08F" />
+        </Style>
+
         <Style Selector="Border.legH">
             <Setter Property="Width" Value="12" />
             <Setter Property="Height" Value="6" />
@@ -173,6 +188,7 @@
                                     <StackPanel HorizontalAlignment="Center">
                                         <Panel Width="110" Height="104">
                                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Opacity="{Binding IdentityOpacity}"
                                                   RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto">
                                                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="9"
                                                             HorizontalAlignment="Center" Margin="0,0,0,-3">
@@ -221,17 +237,38 @@
                                                 <TextBlock Text="UPD" FontSize="10" FontWeight="Bold"
                                                            Foreground="{StaticResource BadgeUpdateTextBrush}" />
                                             </Border>
+
+                                            <!-- Locked: bright padlock over the dimmed chip. -->
+                                            <Viewbox Width="30" Height="30" IsVisible="{Binding IsLocked}"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Panel Width="28" Height="28">
+                                                    <Ellipse Width="28" Height="28" Fill="#99000000" />
+                                                    <Path Data="M9,13 V9.5 A5,5 0 0 1 19,9.5 V13"
+                                                          Stroke="{StaticResource LedAmberBrush}" StrokeThickness="2.2"
+                                                          StrokeLineCap="Round" />
+                                                    <Path Data="M7.5,13 H20.5 A1.5,1.5 0 0 1 22,14.5 V21 A1.5,1.5 0 0 1 20.5,22.5 H7.5 A1.5,1.5 0 0 1 6,21 V14.5 A1.5,1.5 0 0 1 7.5,13 Z"
+                                                          Fill="{StaticResource LedAmberBrush}" />
+                                                    <Ellipse Width="3" Height="3" Fill="#221706"
+                                                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                             Margin="0,3,0,0" />
+                                                </Panel>
+                                            </Viewbox>
                                         </Panel>
 
                                         <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource SilkBrush}"
+                                                   Opacity="{Binding IdentityOpacity}"
                                                    HorizontalAlignment="Center" Margin="0,9,0,0" MaxWidth="126"
                                                    TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding VersionSubline}" FontSize="11"
                                                    Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center"
+                                                   Opacity="{Binding IdentityOpacity}"
                                                    Margin="0,1,0,0" MaxWidth="126" TextTrimming="CharacterEllipsis" />
                                         <Button Classes="pill" Content="{Binding InstallButtonText}"
                                                 Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
-                                                Margin="0,8,0,0" />
+                                                IsVisible="{Binding ShowInstallButton}" Margin="0,8,0,0" />
+                                        <Button Classes="unlock" Content="Unlock"
+                                                Command="{Binding OpenOfferCommand}" IsVisible="{Binding IsLocked}"
+                                                ToolTip.Tip="{Binding OfferHeadline}" Margin="0,8,0,0" />
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

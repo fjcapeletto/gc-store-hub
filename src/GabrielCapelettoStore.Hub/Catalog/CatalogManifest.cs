@@ -12,7 +12,45 @@ public sealed record CatalogManifest
     /// <summary>Monotonic version of the catalog payload; lets the hub detect changes.</summary>
     public int CatalogVersion { get; init; }
 
+    /// <summary>
+    /// The device's store-access state. Drives whether apps render installable or
+    /// locked-with-offer. Absent in the payload = granted (back-compatible default).
+    /// </summary>
+    public CatalogAccess Access { get; init; } = new();
+
     public IReadOnlyList<CatalogApp> Apps { get; init; } = [];
+}
+
+/// <summary>
+/// The device's store-access, as decided server-side. The catalog is visible to every
+/// device; this gates the <em>right to install</em>, not visibility. The client lock is
+/// UX only — the delivery endpoint is the real gate. See <c>contract/</c>.
+/// </summary>
+public sealed record CatalogAccess
+{
+    public StoreAccessState State { get; init; } = StoreAccessState.Granted;
+
+    /// <summary>Optional, only meaningful when locked; lets the client tailor the copy.</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>The sales hook, present when locked. Surfaced in place of the install action.</summary>
+    public CatalogOffer? Offer { get; init; }
+}
+
+/// <summary>Whether this device may install from the store. Serialized kebab-case.</summary>
+public enum StoreAccessState
+{
+    Granted,
+    Locked,
+}
+
+/// <summary>The call-to-action shown when an app (or the whole device) is locked.</summary>
+public sealed record CatalogOffer
+{
+    public required string Headline { get; init; }
+
+    /// <summary>Where to buy access. Opaque — never carries a license key/fingerprint/PII.</summary>
+    public required string ActionUrl { get; init; }
 }
 
 /// <summary>A single publishable app entry on the store shelves.</summary>
@@ -28,6 +66,28 @@ public sealed record CatalogApp
 
     /// <summary>Which identity the app declares it needs. Anchors the three archetypes.</summary>
     public AppIdentityMode IdentityMode { get; init; } = AppIdentityMode.DeviceOnly;
+
+    /// <summary>
+    /// Optional per-app override of installability. Absent = inherit the device-wide
+    /// <see cref="CatalogAccess.State"/> (granted → installable, otherwise → locked).
+    /// </summary>
+    public CatalogInstall? Install { get; init; }
+}
+
+/// <summary>Per-app installability override; wins over the device-wide access default.</summary>
+public sealed record CatalogInstall
+{
+    public AppInstallState State { get; init; } = AppInstallState.Installable;
+
+    /// <summary>App-specific offer, used when this one app is locked while others are not.</summary>
+    public CatalogOffer? Offer { get; init; }
+}
+
+/// <summary>Per-app installability (distinct from the persisted install-state store). Kebab-case.</summary>
+public enum AppInstallState
+{
+    Installable,
+    Locked,
 }
 
 /// <summary>

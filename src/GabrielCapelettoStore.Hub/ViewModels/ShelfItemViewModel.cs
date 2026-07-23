@@ -13,6 +13,7 @@ namespace GabrielCapelettoStore.Hub.ViewModels;
 public sealed partial class ShelfItemViewModel : ObservableObject
 {
     private readonly Action<ShelfItemViewModel>? _installAction;
+    private readonly Action<string>? _openOfferAction;
     private readonly bool _isOnline;
 
     public ShelfItemViewModel(
@@ -21,7 +22,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         bool updateAvailable,
         NoveltyStatus status,
         bool isOnline = true,
-        Action<ShelfItemViewModel>? installAction = null)
+        Action<ShelfItemViewModel>? installAction = null,
+        CatalogAccess? access = null,
+        Action<string>? openOfferAction = null)
     {
         App = app;
         InstalledVersion = installedVersion;
@@ -29,6 +32,15 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         Status = status;
         _isOnline = isOnline;
         _installAction = installAction;
+        _openOfferAction = openOfferAction;
+
+        // Resolution rule (see contract/): an app is installable when its own install
+        // override says so, otherwise it inherits the device-wide access state.
+        access ??= new CatalogAccess();
+        IsLocked = app.Install is not null
+            ? app.Install.State == AppInstallState.Locked
+            : access.State == StoreAccessState.Locked;
+        Offer = app.Install?.Offer ?? access.Offer;
     }
 
     public CatalogApp App { get; }
@@ -65,10 +77,34 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         : UpdateAvailable ? "Update"
         : "Installed";
 
-    /// <summary>Enabled only when there is an action to take AND the store is reachable
-    /// (installing/updating downloads from the backend — not possible offline).</summary>
-    public bool CanInstall => (!IsInstalled || UpdateAvailable) && _isOnline;
+    /// <summary>
+    /// Store-access state for this app, resolved from the per-app override or the
+    /// device-wide access. Locked = visible but not installable; show the offer.
+    /// </summary>
+    public bool IsLocked { get; }
+
+    /// <summary>The sales hook to surface when locked (per-app offer, else device offer).</summary>
+    public CatalogOffer? Offer { get; }
+
+    public bool ShowInstallButton => !IsLocked;
+    public string OfferHeadline => Offer?.Headline ?? "Buy store access";
+
+    /// <summary>Dims the app identity (chip + labels) when locked; the lock/CTA stay bright.</summary>
+    public double IdentityOpacity => IsLocked ? 0.4 : 1.0;
+
+    /// <summary>Enabled only when installable, there is an action to take, AND the store is
+    /// reachable (installing/updating downloads from the backend — not possible offline).</summary>
+    public bool CanInstall => !IsLocked && (!IsInstalled || UpdateAvailable) && _isOnline;
 
     [RelayCommand]
     private void Install() => _installAction?.Invoke(this);
+
+    [RelayCommand]
+    private void OpenOffer()
+    {
+        if (!string.IsNullOrWhiteSpace(Offer?.ActionUrl))
+        {
+            _openOfferAction?.Invoke(Offer.ActionUrl);
+        }
+    }
 }
