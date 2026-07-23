@@ -5,8 +5,11 @@ software hub pre-installed on the refurbished laptops sold by GabrielCapeletto L
 
 The hub behaves like an app store for the device: apps are versioned, updated on
 the user's terms, and can be uninstalled and reinstalled from the hub. It adds
-value to the device and opens a subscription revenue line, while the store
-"vitrine" itself is gated to machines that were sold by GabrielCapeletto LLC.
+value to the device and opens a subscription revenue line. The store vitrine is
+**visible to every device** — entitlement gates the *right to install*, not
+visibility. A machine without store access sees the full catalog with apps
+**locked** and an offer to buy access (the sales hook); the server withholds the
+package/license. See [`contract/`](contract/) for the wire boundary.
 
 > **Status:** early scaffolding. This is the *walking-skeleton* stage — an empty
 > hub with no real apps yet. The first milestone is the distribution pipeline:

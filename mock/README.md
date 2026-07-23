@@ -4,8 +4,10 @@ Sample catalog documents used to exercise the distribution pipeline while the re
 backend does not exist yet. The hub fetches whatever URL is set in
 `Catalog:Url` (see `src/GabrielCapelettoStore.Hub/appsettings.json`).
 
-- `catalog.json` — two sample apps → the hub shows populated shelves.
-- `catalog.empty.json` — no apps → the hub shows the empty-shelves state.
+- `catalog.json` — several sample apps → the hub shows populated shelves.
+- `catalog.empty.json` — no apps → the empty-*catalog* state (a granted device
+  with nothing published yet). Distinct from the locked state, where apps are
+  visible but not installable — see [`contract/`](../contract/).
 
 ## How to serve it (pick one)
 
