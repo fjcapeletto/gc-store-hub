@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fjcapeletto/gc-store-hub/contract/catalog.schema.json",
+  "title": "GC Store Catalog Manifest",
+  "description": "The wire shape the hub receives from the backend catalog endpoint. Source of truth for the boundary between the public hub client and the private server. Serialized camelCase; enums kebab-case. The catalog is VISIBLE to every device; installability is gated by the device's store access (see `access`). The lock is UX only — real enforcement is the delivery endpoint refusing to serve packages/licenses to a non-granted device.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["catalogVersion", "access", "apps"],
+  "properties": {
+    "catalogVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic version of the catalog payload; lets the hub detect changes between fetches."
+    },
+    "access": {
+      "$ref": "#/$defs/access",
+      "description": "The device's store-access state. Drives whether apps render installable or locked-with-offer."
+    },
+    "apps": {
+      "type": "array",
+      "description": "The shelves. Always the full catalog — the shelf is the same for everyone; access decides what can be installed.",
+      "items": { "$ref": "#/$defs/catalogApp" }
+    }
+  },
+  "$defs": {
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["granted", "locked"],
+          "description": "granted: this device may install (subject to per-app identityMode). locked: apps are visible but not installable — show the offer."
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["unrecognized-device", "no-store-access"],
+          "description": "Optional, only meaningful when state is locked. unrecognized-device: we don't know this machine. no-store-access: known device without store entitlement. Lets the client tailor the copy."
+        },
+        "offer": {
+          "$ref": "#/$defs/offer",
+          "description": "The sales hook. Present when state is locked; the client surfaces it in place of the install action."
+        }
+      }
+    },
+    "offer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline", "actionUrl"],
+      "properties": {
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short call to action, e.g. \"Unlock the Gabriel Capeletto Store\"."
+        },
+        "actionUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Where to buy store access. Must be opaque — no license key, fingerprint, or other PII in the URL/query."
+        }
+      }
+    },
+    "catalogApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable app identifier, e.g. \"com.gc.weather\". Immutable across versions."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-facing app name shown on the shelf."
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Published version string, e.g. \"1.3.0\". The hub compares this against the installed version to offer updates."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Optional one-line description."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional glyph key for the chip's inner identity (e.g. \"cloud\", \"music\"). A real icon URL may replace this later."
+        },
+        "identityMode": {
+          "type": "string",
+          "enum": ["device-only", "account-required", "hybrid"],
+          "default": "device-only",
+          "description": "The identity the app declares it needs. Absent means device-only."
+        },
+        "install": {
+          "$ref": "#/$defs/install",
+          "description": "Optional per-app override of installability. Absent means: inherit from access.state (granted -> installable, otherwise -> locked)."
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["installable", "locked"],
+          "description": "Per-app installability. Overrides the device-wide default from access.state for this app only."
+        },
+        "offer": {
+          "$ref": "#/$defs/offer",
+          "description": "Optional app-specific offer, used when this app is individually locked while others are installable."
+        }
+      }
+    }
+  }
+}

@@ -37,8 +37,10 @@ belongs in the private backend and must not appear here.
   updates, uninstall/reinstall from the hub.
 - Current stage is **empty-hub-first**: build the empty store, prove the
   distribution pipeline before any real app exists.
-- The store vitrine is **device-authorized** at the catalog API layer — an
-  unrecognized machine sees empty shelves.
+- The store vitrine is **visible to every device**; entitlement gates the *right to
+  install*, not visibility. An unentitled machine sees the full catalog with apps
+  **locked** and an **offer** to buy store access (the sales hook). The client-side
+  lock is UX only — the server withholds the package/license. See `contract/`.
 - Apps declare their identity needs: device-only, account-required, or hybrid.
 
 ## Tech
