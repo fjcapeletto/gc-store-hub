@@ -9,11 +9,10 @@ using Avalonia.Platform;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
+using GabrielCapelettoStore.Hub.Update;
 using GabrielCapelettoStore.Hub.ViewModels;
 using GabrielCapelettoStore.Hub.Views;
 using Microsoft.Extensions.Configuration;
-using Velopack;
-using Velopack.Sources;
 
 namespace GabrielCapelettoStore.Hub;
 
@@ -22,9 +21,7 @@ public partial class App : Application
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private MainWindow? _mainWindow;
     private TrayIcon? _trayIcon;
-
-    private UpdateManager? _updateManager;
-    private UpdateInfo? _pendingUpdate;
+    private IUpdateService _updateService = new NullUpdateService();
 
     public override void Initialize()
     {
@@ -81,9 +78,12 @@ public partial class App : Application
 
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
+            _updateService = new UpdateService(
+                configuration["Update:GithubRepo"], configuration["Update:FeedUrl"]);
+
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
-                entitlement);
+                entitlement, _updateService);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 
@@ -99,9 +99,9 @@ public partial class App : Application
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).
             _ = viewModel.LoadAsync();
 
-            // Best-effort self-update check (no-op unless an update source is configured
-            // AND this is a real Velopack install).
-            _ = CheckForUpdatesAsync(configuration["Update:GithubRepo"], configuration["Update:FeedUrl"]);
+            // Self-update check — surfaces progress in the header (no-op unless a source is
+            // configured AND this is a real Velopack install).
+            _ = _updateService.CheckAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -157,64 +157,9 @@ public partial class App : Application
             _trayIcon.IsVisible = false;
         }
 
-        // If an update was downloaded, swap it in after we exit — next launch is the new version.
-        if (_updateManager is not null && _pendingUpdate is not null)
-        {
-            try
-            {
-                _updateManager.WaitExitThenApplyUpdates(_pendingUpdate, silent: true, restart: false);
-            }
-            catch
-            {
-                // Applying an update must never block quitting.
-            }
-        }
+        // If an update was downloaded but not applied, swap it in after we exit.
+        _updateService.ApplyOnExit();
 
         _desktop?.Shutdown();
-    }
-
-    private async Task CheckForUpdatesAsync(string? githubRepo, string? feedUrl)
-    {
-        // Prefer the GitHub Releases feed (the hub's binaries are public — no infra needed);
-        // fall back to a plain static feed URL if one is configured instead.
-        IUpdateSource? source = null;
-        if (!string.IsNullOrWhiteSpace(githubRepo))
-        {
-            source = new GithubSource(githubRepo, accessToken: null, prerelease: false);
-        }
-        else if (!string.IsNullOrWhiteSpace(feedUrl))
-        {
-            source = new SimpleWebSource(feedUrl);
-        }
-
-        if (source is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var manager = new UpdateManager(source);
-            if (!manager.IsInstalled)
-            {
-                return; // running from source / not a Velopack install — nothing to update.
-            }
-
-            var info = await manager.CheckForUpdatesAsync().ConfigureAwait(false);
-            if (info is null)
-            {
-                return;
-            }
-
-            await manager.DownloadUpdatesAsync(info).ConfigureAwait(false);
-
-            // Staged, not applied: it swaps in on the next quit/relaunch, never mid-use.
-            _updateManager = manager;
-            _pendingUpdate = info;
-        }
-        catch
-        {
-            // Update checks are best-effort; a bad/unreachable feed must not affect the hub.
-        }
     }
 }

@@ -64,6 +64,9 @@
         <Style Selector="Button.unlock:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#F6D08F" />
         </Style>
+        <Style Selector="Button.unlock:disabled">
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
 
         <Style Selector="TextBox">
             <Setter Property="Background" Value="#0E1712" />
@@ -124,6 +127,11 @@
                                FontSize="12" Foreground="{StaticResource LedAmberBrush}" Margin="0,3,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <!-- Self-update chip: shows while downloading; becomes a Restart button when ready. -->
+                    <Button Classes="unlock" Content="{Binding UpdateStatusText}"
+                            IsVisible="{Binding ShowUpdate}" IsEnabled="{Binding IsUpdateReady}"
+                            Command="{Binding RestartUpdateCommand}" FontSize="11" Padding="12,3"
+                            ToolTip.Tip="Restart to apply the update" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <TextBlock Text="{Binding SyncStatus}" IsVisible="{Binding HasSyncStatus}"
                                FontSize="12" Foreground="{StaticResource SilkMutedBrush}"
                                VerticalAlignment="Center" Margin="0,0,6,0" />

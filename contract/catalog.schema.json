@@ -5,7 +5,7 @@
   "description": "The wire shape the hub receives from the backend catalog endpoint. Source of truth for the boundary between the public hub client and the private server. Serialized camelCase; enums kebab-case. The catalog is VISIBLE to every device; installability is gated by the device's store access (see `access`). The lock is UX only — real enforcement is the delivery endpoint refusing to serve packages/licenses to a non-granted device.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["catalogVersion", "access", "apps"],
+  "required": ["catalogVersion", "apps"],
   "properties": {
     "catalogVersion": {
       "type": "integer",
@@ -14,7 +14,7 @@
     },
     "access": {
       "$ref": "#/$defs/access",
-      "description": "The device's store-access state. Drives whether apps render installable or locked-with-offer."
+      "description": "OPTIONAL and superseded when an entitlement server is configured: access is decided per device by POST /v1/authorize, not baked into the shelf. The catalog is pure content; the hub ignores this field when entitlement is configured. Kept for the catalog-only (no server) fallback."
     },
     "apps": {
       "type": "array",

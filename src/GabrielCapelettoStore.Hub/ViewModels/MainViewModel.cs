@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
+using GabrielCapelettoStore.Hub.Update;
 
 namespace GabrielCapelettoStore.Hub.ViewModels;
 
@@ -20,6 +22,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IInstallStateStore _installStore;
     private readonly ICatalogCache _cache;
     private readonly IEntitlementService _entitlement;
+    private readonly IUpdateService _updateService;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -34,21 +37,48 @@ public partial class MainViewModel : ViewModelBase
         ICatalogCache cache,
         IDeviceFingerprintCollector fingerprintCollector,
         IIdentityBaselineStore baselineStore,
-        IEntitlementService entitlement)
+        IEntitlementService entitlement,
+        IUpdateService updateService)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
         _installStore = installStore;
         _cache = cache;
         _entitlement = entitlement;
+        _updateService = updateService;
+        _updateService.StateChanged += OnUpdateStateChanged;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
+
+    // Update state changes arrive off the UI thread → marshal, then refresh the header indicator.
+    private void OnUpdateStateChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        OnPropertyChanged(nameof(ShowUpdate));
+        OnPropertyChanged(nameof(IsUpdateReady));
+        OnPropertyChanged(nameof(UpdateStatusText));
+    });
+
+    /// <summary>Show the header update chip while an update is downloading or ready.</summary>
+    public bool ShowUpdate => _updateService.State is UpdateState.Downloading or UpdateState.Ready;
+
+    /// <summary>Downloaded and staged → the chip becomes a "Restart to update" button.</summary>
+    public bool IsUpdateReady => _updateService.State == UpdateState.Ready;
+
+    public string UpdateStatusText => _updateService.State switch
+    {
+        UpdateState.Downloading => $"Downloading update {_updateService.NewVersion}…",
+        UpdateState.Ready => $"Update {_updateService.NewVersion} ready — restart",
+        _ => "",
+    };
+
+    [RelayCommand]
+    private void RestartUpdate() => _updateService.ApplyAndRestart();
 
     /// <summary>Design-time constructor: seeds the previewer with mixed states so badges/buttons show.</summary>
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
         new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
-        new NullEntitlementService())
+        new NullEntitlementService(), new NullUpdateService())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -279,19 +309,32 @@ public partial class MainViewModel : ViewModelBase
                     : "";
                 SyncStatus = online ? "" : "Store server offline";
             }
-            else if (!silent)
+            else
             {
-                // Nothing to show at all (first run, server down, no cache) → honest hard error.
                 Apps.Clear();
                 AppCount = 0;
                 NewCount = 0;
                 UpdatedCount = 0;
-                ErrorMessage = $"Couldn't reach the store.\n{catalogError?.Message}";
-                SyncStatus = "Store server offline";
-            }
-            else
-            {
-                SyncStatus = online ? "" : "Store server offline";
+
+                if (online)
+                {
+                    // The store server is up but there's no catalog yet (no endpoint / transient).
+                    // Don't dead-end to "Store unavailable": show the empty state, and the access /
+                    // licensing flow (the key menu) stays fully usable.
+                    ErrorMessage = null;
+                    OfflineNotice = "";
+                    SyncStatus = "";
+                }
+                else if (!silent)
+                {
+                    // Truly nothing reachable and no cache → the honest hard error.
+                    ErrorMessage = $"Couldn't reach the store.\n{catalogError?.Message}";
+                    SyncStatus = "Store server offline";
+                }
+                else
+                {
+                    SyncStatus = "Store server offline";
+                }
             }
         }
         finally
