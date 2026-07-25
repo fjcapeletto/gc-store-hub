@@ -1,5 +1,5 @@
 using System;
-using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -10,16 +10,16 @@ namespace GabrielCapelettoStore.Hub.Views;
 
 public partial class MainWindow : Window
 {
-    // Gentle cadence while reachable; a faster retry while offline so recovery feels automatic.
-    private static readonly TimeSpan OnlineInterval = TimeSpan.FromHours(1);
-    private static readonly TimeSpan OfflineRetryInterval = TimeSpan.FromSeconds(60);
+    // Heartbeat cadence follows visibility: beat fast while someone is looking at the LED,
+    // slow while parked in the tray (nobody sees it — spares the one server across many hubs).
+    private static readonly TimeSpan VisibleInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HiddenInterval = TimeSpan.FromHours(1);
 
-    // Ignore focus-triggered refreshes that come right after another one — including
-    // the very click that activates the window (which must not rebuild the shelves).
-    private static readonly TimeSpan ActivateDebounce = TimeSpan.FromSeconds(30);
+    // Coalesce the show+activate burst into a single refresh; well under the 30s cadence.
+    private static readonly TimeSpan CoalesceWindow = TimeSpan.FromSeconds(3);
 
-    private DispatcherTimer? _refreshTimer;
-    private DateTime _lastActivateRefreshUtc = DateTime.MinValue;
+    private readonly DispatcherTimer _refreshTimer;
+    private DateTime _lastRefreshUtc = DateTime.MinValue;
 
     /// <summary>When false, closing the window hides it to the tray instead of exiting.
     /// The tray's Quit sets this true so the app can actually shut down.</summary>
@@ -29,9 +29,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        Opened += OnOpened;
-        Activated += OnActivated;
-        Closed += OnClosed;
+        // The window starts hidden (tray); the visibility handler speeds it up when shown.
+        _refreshTimer = new DispatcherTimer { Interval = HiddenInterval };
+        _refreshTimer.Tick += (_, _) => Refresh();
+        _refreshTimer.Start();
     }
 
     // Close (the window X) hides to the tray; the app keeps running there until Quit.
@@ -42,58 +43,40 @@ public partial class MainWindow : Window
             e.Cancel = true;
             Hide();
         }
+        else
+        {
+            _refreshTimer.Stop();
+        }
 
         base.OnClosing(e);
     }
 
+    // Visibility drives the heartbeat: fast + an immediate check when shown, slow when hidden.
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty)
+        {
+            var visible = change.GetNewValue<bool>();
+            _refreshTimer.Interval = visible ? VisibleInterval : HiddenInterval;
+            if (visible)
+            {
+                Refresh();
+            }
+        }
+    }
+
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
-    private void OnOpened(object? sender, EventArgs e)
-    {
-        _refreshTimer = new DispatcherTimer { Interval = OnlineInterval };
-        _refreshTimer.Tick += (_, _) => Refresh();
-        _refreshTimer.Start();
-
-        if (ViewModel is { } vm)
-        {
-            vm.PropertyChanged += OnViewModelPropertyChanged;
-        }
-    }
-
-    // Adaptive recovery: retry faster while offline, back off once reachable again.
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.IsOnline) && _refreshTimer is not null && ViewModel is { } vm)
-        {
-            _refreshTimer.Interval = vm.IsOnline ? OnlineInterval : OfflineRetryInterval;
-        }
-    }
-
-    // Re-check when the user brings the window back into focus, but debounced so a
-    // click that merely activates the window does not trigger a rebuild mid-click.
-    private void OnActivated(object? sender, EventArgs e)
+    private void Refresh()
     {
         var nowUtc = DateTime.UtcNow;
-        if (nowUtc - _lastActivateRefreshUtc < ActivateDebounce)
+        if (nowUtc - _lastRefreshUtc < CoalesceWindow)
         {
             return;
         }
 
-        _lastActivateRefreshUtc = nowUtc;
-        Refresh();
-    }
-
-    private void OnClosed(object? sender, EventArgs e)
-    {
-        _refreshTimer?.Stop();
-        if (ViewModel is { } vm)
-        {
-            vm.PropertyChanged -= OnViewModelPropertyChanged;
-        }
-    }
-
-    private void Refresh()
-    {
+        _lastRefreshUtc = nowUtc;
         if (ViewModel is { } vm)
         {
             _ = vm.RefreshAsync();

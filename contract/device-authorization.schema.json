@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fjcapeletto/gc-store-hub/contract/device-authorization.schema.json",
+  "title": "GC Store Device Authorization",
+  "description": "Wire shapes for device authorization and package delivery between the public hub client and the private server. Source of truth for the boundary. Serialized camelCase; enums kebab-case; timestamps RFC 3339 UTC. The entitlement lease itself is NOT modeled here as JSON: it is a JWS Compact string (RFC 7515) signed with EdDSA (RFC 8037); `leasePayload` below documents its decoded claims. See device-authorization.md.",
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deviceId"],
+      "description": "The device claim. `license` is optional — a license-less device with a pending request still reaches authorize to receive `access-pending`. Privacy rule: never carried in a URL/query — body over TLS only.",
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hub-generated, opaque, persisted device identifier (see device-identity-provisioning.md). Paired with license in the DB; the server binds the fingerprint to it at activation."
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Device license key — the identity anchor."
+        },
+        "fingerprint": {
+          "type": "object",
+          "description": "Advisory/soft signals (MAC, WMI attributes). Spoofable; never the sole basis for a strong grant."
+        },
+        "attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tpmEk": {
+              "type": "string",
+              "description": "Optional TPM endorsement key public part, when the hub can read it. Enables identity attestation, NOT delivery-key sealing."
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemes", "trustedKeyIds"],
+      "description": "What this device's hub can do. Lets the server pick a compatible key-envelope scheme and a lease-verification key, and fail closed otherwise.",
+      "properties": {
+        "schemes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key-envelope schemes the hub can unwrap, e.g. \"tpm-seal-v1\", \"fingerprint-wrap-v1\". The server picks from the intersection with its own set."
+        },
+        "canSealTpm": {
+          "type": "boolean",
+          "description": "The hub can seal/unseal a key to this device's TPM (strong delivery binding). Distinct from hasTpmEk."
+        },
+        "hasTpmEk": {
+          "type": "boolean",
+          "description": "The hub can read the TPM EK public key (identity attestation). Does NOT imply canSealTpm."
+        },
+        "trustedKeyIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lease-verification keyIds embedded in this device's installed hub release. The server MUST sign the lease with a keyId in this set (self-negotiating rotation)."
+        }
+      }
+    },
+    "authorizeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "capabilities"],
+      "description": "Body of POST /v1/authorize (also the renewal call).",
+      "properties": {
+        "claim": { "$ref": "#/$defs/claim" },
+        "capabilities": { "$ref": "#/$defs/capabilities" }
+      }
+    },
+    "accessRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deviceId", "name", "email"],
+      "description": "Body of POST /v1/access-request — a machine with no license asking for store access (a-posteriori path). Server stores it as 'requested' for manual approval.",
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hub-generated opaque device id (see device-identity-provisioning.md)."
+        },
+        "name": { "type": "string", "minLength": 1, "description": "Requester full name (v1)." },
+        "email": { "type": "string", "format": "email", "description": "Requester email — where the license key is sent on approval." },
+        "phone": { "type": "string", "description": "Optional contact phone." },
+        "fingerprint": {
+          "type": "object",
+          "description": "Advisory signals, for review and for binding at activation. Optional."
+        }
+      }
+    },
+    "leasePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sub", "iat", "entitlements"],
+      "description": "Decoded claims of the JWS lease (documentation only — on the wire the lease is a JWS Compact string with an EdDSA signature and a header carrying alg=EdDSA and kid).",
+      "properties": {
+        "sub": {
+          "type": "string",
+          "minLength": 1,
+          "description": "deviceId — opaque, server-assigned; NOT the license key. The hub checks it against the identity it resolves locally (anti-replay)."
+        },
+        "iat": {
+          "type": "integer",
+          "description": "Issued-at (epoch seconds). The hub's last-trusted-time anchor."
+        },
+        "exp": {
+          "type": "integer",
+          "description": "Renewal horizon (epoch seconds) = earliest paid notAfter. Omitted when all entitlements are perpetual. Reaching it means 'refresh needed', not 'all entitlements end'."
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["tpm", "fingerprint"],
+          "description": "The binding tier actually granted."
+        },
+        "entitlements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entitlement" }
+        }
+      }
+    },
+    "entitlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["appId", "state"],
+      "properties": {
+        "appId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "App this entitlement covers, e.g. \"com.gc.weather\"."
+        },
+        "state": {
+          "type": "string",
+          "enum": ["granted", "revoked"],
+          "description": "The hub launches an app only when granted and (if notAfter present) still within validity."
+        },
+        "notAfter": {
+          "type": "integer",
+          "description": "Per-app hard cutoff (epoch seconds). ABSENT = perpetual (free/device-only). Present = expiring (paid)."
+        }
+      }
+    },
+    "deliveryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["appId", "version", "package", "keyEnvelope"],
+      "description": "Body of a successful POST /v1/delivery/{appId}. An ungranted device gets 402/403 with a catalog `offer` instead.",
+      "properties": {
+        "appId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "package": { "$ref": "#/$defs/package" },
+        "keyEnvelope": { "$ref": "#/$defs/keyEnvelope" }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "expiresAt", "hash"],
+      "description": "Pointer to the CIPHERTEXT package. Storage is private and non-listable.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Short-lived, single-use signed URL to the ciphertext. Expires in minutes. No PII in the URL."
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the signed URL stops working."
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ciphertext size, for progress/preallocation."
+        },
+        "hash": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["alg", "value"],
+          "description": "Integrity check for the downloaded ciphertext.",
+          "properties": {
+            "alg": { "type": "string", "enum": ["sha-256"] },
+            "value": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "keyEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "binding", "wrappedKey"],
+      "description": "The content key wrapped to this device. The wrapping/sealing METHOD is private server logic; only this shape is on the wire. Lifetime is device-bound, not time-bound (decoupled from package.url).",
+      "properties": {
+        "scheme": {
+          "type": "string",
+          "description": "Chosen from capabilities.schemes ∩ server, e.g. \"tpm-seal-v1\". Versioned; server fails closed on no overlap."
+        },
+        "binding": {
+          "type": "string",
+          "enum": ["tpm", "fingerprint"],
+          "description": "tpm: only this device's TPM can unseal (strong). fingerprint: soft, device-derived (spoofable)."
+        },
+        "wrappedKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base64 content key, wrapped so only this device can unwrap."
+        }
+      }
+    }
+  }
+}

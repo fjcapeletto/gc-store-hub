@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
 
 namespace GabrielCapelettoStore.Hub.ViewModels;
@@ -18,10 +19,12 @@ public partial class MainViewModel : ViewModelBase
     private readonly ICatalogStateStore _observationStore;
     private readonly IInstallStateStore _installStore;
     private readonly ICatalogCache _cache;
+    private readonly IEntitlementService _entitlement;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
     private InstallState _install = new();
+    private AuthorizeOutcome? _authorize;
     private string _shelfSignature = "";
 
     public MainViewModel(
@@ -30,19 +33,22 @@ public partial class MainViewModel : ViewModelBase
         IInstallStateStore installStore,
         ICatalogCache cache,
         IDeviceFingerprintCollector fingerprintCollector,
-        IIdentityBaselineStore baselineStore)
+        IIdentityBaselineStore baselineStore,
+        IEntitlementService entitlement)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
         _installStore = installStore;
         _cache = cache;
+        _entitlement = entitlement;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
 
     /// <summary>Design-time constructor: seeds the previewer with mixed states so badges/buttons show.</summary>
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
-        new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore())
+        new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
+        new NullEntitlementService())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -70,7 +76,37 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>Whether the Settings view is showing instead of the catalog.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
     public partial bool ShowSettings { get; set; }
+
+    /// <summary>Whether the Access / licensing view is showing instead of the catalog.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
+    public partial bool ShowAccess { get; set; }
+
+    /// <summary>The catalog area shows only when neither Settings nor Access is open.</summary>
+    public bool ShowMainArea => !ShowSettings && !ShowAccess;
+
+    // --- Access / licensing (a-posteriori path; see contract/device-identity-provisioning.md) ---
+    [ObservableProperty] public partial string AccessName { get; set; } = "";
+    [ObservableProperty] public partial string AccessEmail { get; set; } = "";
+    [ObservableProperty] public partial string AccessPhone { get; set; } = "";
+    [ObservableProperty] public partial string LicenseKeyInput { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAccessMessage))]
+    public partial string AccessMessage { get; set; } = "";
+
+    public bool HasAccessMessage => !string.IsNullOrEmpty(AccessMessage);
+
+    public string DeviceId => _entitlement.DeviceId;
+    public bool HasLicense => _entitlement.HasLicense;
+    public bool AccessRequested => _entitlement.AccessRequested;
+
+    /// <summary>Awaiting approval — from the server (403 access-pending) or a just-submitted request.</summary>
+    public bool IsAccessPending =>
+        (_authorize is { Status: AuthorizeStatus.Locked, Reason: "access-pending" })
+        || _entitlement.AccessRequested;
 
     public ObservableCollection<ShelfItemViewModel> Apps { get; } = [];
 
@@ -160,74 +196,102 @@ public partial class MainViewModel : ViewModelBase
 
         SyncStatus = "Checking…";
         var now = DateTimeOffset.UtcNow;
+        _install = _installStore.Load();
 
         try
         {
-            var manifest = await _catalogSource.GetCatalogAsync();
+            // --- Load the shelf (catalog). Best effort: fall back to the last-known cache. ---
+            Exception? catalogError = null;
+            var catalogFromCache = false;
+            var cacheAge = default(DateTimeOffset);
 
-            var previous = _observationStore.Load();
-            var firstRun = previous is null;
-            var observation = previous ?? new CatalogObservationState();
-
-            // Refresh freshness timestamps: a new app or a changed available version restarts its window.
-            var apps = new Dictionary<string, AppObservation>(StringComparer.Ordinal);
-            foreach (var app in manifest.Apps)
+            try
             {
-                var noveltySince =
-                    observation.Apps.TryGetValue(app.Id, out var prior) &&
-                    string.Equals(prior.AvailableVersion, app.Version, StringComparison.Ordinal)
-                        ? prior.NoveltySince
-                        : now;
+                var manifest = await _catalogSource.GetCatalogAsync();
 
-                apps[app.Id] = new AppObservation { AvailableVersion = app.Version, NoveltySince = noveltySince };
+                var previous = _observationStore.Load();
+                var firstRun = previous is null;
+                var observation = previous ?? new CatalogObservationState();
+
+                // Refresh freshness timestamps: a new app or a changed available version restarts its window.
+                var apps = new Dictionary<string, AppObservation>(StringComparer.Ordinal);
+                foreach (var app in manifest.Apps)
+                {
+                    var noveltySince =
+                        observation.Apps.TryGetValue(app.Id, out var prior) &&
+                        string.Equals(prior.AvailableVersion, app.Version, StringComparison.Ordinal)
+                            ? prior.NoveltySince
+                            : now;
+
+                    apps[app.Id] = new AppObservation { AvailableVersion = app.Version, NoveltySince = noveltySince };
+                }
+                observation.Apps = apps;
+
+                // First-ever run: suppress the "since your last visit" greeting (badges still show).
+                if (firstRun && observation.BannerDismissedAt is null)
+                {
+                    observation.BannerDismissedAt = now;
+                }
+
+                _observationStore.Save(observation);
+                _manifest = manifest;
+                _observation = observation;
+                _cache.Save(manifest, now);
             }
-            observation.Apps = apps;
-
-            // First-ever run: suppress the "since your last visit" greeting (badges still show).
-            if (firstRun && observation.BannerDismissedAt is null)
+            catch (Exception ex)
             {
-                observation.BannerDismissedAt = now;
+                catalogError = ex;
+                var cached = _cache.Load();
+                if (cached is not null)
+                {
+                    _manifest = cached.Manifest;
+                    _observation = _observationStore.Load() ?? new CatalogObservationState();
+                    catalogFromCache = true;
+                    cacheAge = cached.SyncedAt;
+                }
             }
 
-            _observationStore.Save(observation);
-
-            _manifest = manifest;
-            _observation = observation;
-            _install = _installStore.Load();
-
-            IsOnline = true;
-            OfflineNotice = "";
-            SyncStatus = "";
-            Rebuild(now);
-
-            // A successful fetch clears any prior error and refreshes the offline cache.
-            ErrorMessage = null;
-            _cache.Save(manifest, now);
-        }
-        catch (Exception ex)
-        {
-            IsOnline = false;
-            SyncStatus = "Store server offline";
-
-            var cached = _cache.Load();
-            if (cached is not null)
+            // --- Heartbeat + authorization: ONE pull to the ONE server. With a license, the
+            //     authorize call is the pull (its app-level reply = alive AND carries access).
+            //     Without a license, the access flow is local, so a plain /healthz ping is the beat. ---
+            bool online;
+            if (_entitlement.IsConfigured)
             {
-                // Offline / backend down, but we have last-known shelves → show them, not an error.
-                _manifest = cached.Manifest;
-                _observation = _observationStore.Load() ?? new CatalogObservationState();
-                _install = _installStore.Load();
+                // One pull to the one server — liveness AND access, license or not. A license-less
+                // pending device reaches the server to receive access-pending.
+                _authorize = await _entitlement.AuthorizeAsync();
+                online = _authorize.Status != AuthorizeStatus.Unreachable;
+            }
+            else
+            {
+                online = catalogError is null;
+            }
+            IsOnline = online;
+            OnPropertyChanged(nameof(IsAccessPending));
+
+            if (_manifest is not null)
+            {
                 ErrorMessage = null;
                 Rebuild(now);
-                OfflineNotice = $"Showing last known catalog · synced {RelativeTime(cached.SyncedAt, now)}";
+                OfflineNotice =
+                    !online ? "Can't reach the store server — access is limited until it's back."
+                    : catalogFromCache ? $"Showing last known catalog · synced {RelativeTime(cacheAge, now)}"
+                    : "";
+                SyncStatus = online ? "" : "Store server offline";
             }
             else if (!silent)
             {
-                // No cache at all (first-run offline) → the honest hard error.
+                // Nothing to show at all (first run, server down, no cache) → honest hard error.
                 Apps.Clear();
                 AppCount = 0;
                 NewCount = 0;
                 UpdatedCount = 0;
-                ErrorMessage = $"Couldn't reach the store catalog.\n{ex.Message}";
+                ErrorMessage = $"Couldn't reach the store.\n{catalogError?.Message}";
+                SyncStatus = "Store server offline";
+            }
+            else
+            {
+                SyncStatus = online ? "" : "Store server offline";
             }
         }
         finally
@@ -253,7 +317,7 @@ public partial class MainViewModel : ViewModelBase
 
         var dismissedAt = _observation.BannerDismissedAt ?? DateTimeOffset.MinValue;
 
-        var access = _manifest.Access;
+        var access = EffectiveAccess();
 
         var items = new List<ShelfItemViewModel>(_manifest.Apps.Count);
         var signature = new StringBuilder();
@@ -300,7 +364,8 @@ public partial class MainViewModel : ViewModelBase
             }
 
             var item = new ShelfItemViewModel(
-                app, installedVersion, updateAvailable, status, IsOnline, InstallApp, access, OpenOffer);
+                app, installedVersion, updateAvailable, status, IsOnline, InstallApp, access, OpenOffer,
+                EntitlementOverride(app.Id));
             items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')
@@ -327,17 +392,77 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Opens the offer landing (buy store access) in the user's default browser.</summary>
-    private void OpenOffer(string url)
+    /// <summary>The "Unlock" CTA on a locked app opens the in-hub access / licensing panel.</summary>
+    private void OpenOffer(string url) => OpenAccess();
+
+    /// <summary>
+    /// The device's effective store access. Catalog-only mode (no entitlement endpoint) trusts the
+    /// catalog's own access field (mock). Otherwise the live <c>/v1/authorize</c> outcome decides:
+    /// granted, locked-with-offer, or locked (can't verify — needs update / unreachable).
+    /// </summary>
+    private CatalogAccess EffectiveAccess()
     {
-        try
+        if (!_entitlement.IsConfigured)
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            return _manifest?.Access ?? new CatalogAccess();
         }
-        catch
+
+        if (_authorize is null)
         {
-            // A bad/unreachable offer URL must never crash the hub; the CTA is best-effort.
+            return new CatalogAccess { State = StoreAccessState.Locked };
         }
+
+        // Server-driven: the authorize reason (unrecognized-device / no-store-access /
+        // access-pending) decides how the locked shelf reads. The CTA opens the in-hub
+        // access panel (OpenOffer → OpenAccess); synthesize an offer when the server sends none.
+        return _authorize.Status switch
+        {
+            AuthorizeStatus.Granted => new CatalogAccess { State = StoreAccessState.Granted },
+            AuthorizeStatus.Locked => new CatalogAccess
+            {
+                State = StoreAccessState.Locked,
+                Reason = _authorize.Reason,
+                Offer = _authorize.Offer ?? new CatalogOffer
+                {
+                    Headline = _authorize.Reason == "access-pending"
+                        ? "Access requested — awaiting approval"
+                        : "Unlock the Gabriel Capeletto Store",
+                    ActionUrl = "",
+                },
+            },
+            // MustUpdate / Unreachable: we cannot prove entitlement → lock, no offer to sell.
+            _ => new CatalogAccess { State = StoreAccessState.Locked },
+        };
+    }
+
+    /// <summary>
+    /// Per-app installability derived from the verified lease. Only meaningful under a granted
+    /// device; a locked device is already handled device-wide by <see cref="EffectiveAccess"/>.
+    /// </summary>
+    private CatalogInstall? EntitlementOverride(string appId)
+    {
+        if (_authorize?.Status != AuthorizeStatus.Granted || _authorize.Lease is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const long skewSeconds = 300; // ±5 min clock tolerance (contract §5)
+
+        foreach (var e in _authorize.Lease.Entitlements)
+        {
+            if (!string.Equals(e.AppId, appId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var granted = string.Equals(e.State, "granted", StringComparison.Ordinal)
+                && (e.NotAfter is null || now <= e.NotAfter.Value + skewSeconds);
+            return new CatalogInstall { State = granted ? AppInstallState.Installable : AppInstallState.Locked };
+        }
+
+        // Granted device but no entitlement for this app → not installable.
+        return new CatalogInstall { State = AppInstallState.Locked };
     }
 
     /// <summary>Stub install: records the installed version only (no real installation yet), then re-renders.</summary>
@@ -368,6 +493,64 @@ public partial class MainViewModel : ViewModelBase
 
     [RelayCommand]
     private void CloseSettings() => ShowSettings = false;
+
+    [RelayCommand]
+    private void OpenAccess()
+    {
+        AccessMessage = "";
+        ShowSettings = false;
+        ShowAccess = true;
+    }
+
+    [RelayCommand]
+    private void CloseAccess() => ShowAccess = false;
+
+    [RelayCommand]
+    private async Task RequestAccess()
+    {
+        if (string.IsNullOrWhiteSpace(AccessName) || string.IsNullOrWhiteSpace(AccessEmail))
+        {
+            AccessMessage = "Enter your full name and email.";
+            return;
+        }
+
+        AccessMessage = "Sending request…";
+        var result = await _entitlement.RequestAccessAsync(AccessName, AccessEmail, AccessPhone);
+        if (result.Submitted)
+        {
+            AccessMessage = "Request sent. You'll get a license key by email once approved.";
+            NotifyAccessStateChanged();
+            await RefreshAsync();
+        }
+        else
+        {
+            AccessMessage = $"Couldn't send the request. {result.Detail}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ActivateLicense()
+    {
+        if (string.IsNullOrWhiteSpace(LicenseKeyInput))
+        {
+            AccessMessage = "Paste the license key from your email.";
+            return;
+        }
+
+        _entitlement.SetLicense(LicenseKeyInput);
+        AccessMessage = "Activating…";
+        NotifyAccessStateChanged();
+        await RefreshAsync();
+        AccessMessage = HasLicense ? "License saved. Syncing your access…" : "Couldn't save the license.";
+    }
+
+    private void NotifyAccessStateChanged()
+    {
+        OnPropertyChanged(nameof(HasLicense));
+        OnPropertyChanged(nameof(AccessRequested));
+        OnPropertyChanged(nameof(IsAccessPending));
+        OnPropertyChanged(nameof(DeviceId));
+    }
 
     private static bool IsNewer(string candidate, string baseline)
     {

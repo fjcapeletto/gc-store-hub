@@ -24,7 +24,8 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         bool isOnline = true,
         Action<ShelfItemViewModel>? installAction = null,
         CatalogAccess? access = null,
-        Action<string>? openOfferAction = null)
+        Action<string>? openOfferAction = null,
+        CatalogInstall? installOverride = null)
     {
         App = app;
         InstalledVersion = installedVersion;
@@ -34,13 +35,15 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         _installAction = installAction;
         _openOfferAction = openOfferAction;
 
-        // Resolution rule (see contract/): an app is installable when its own install
-        // override says so, otherwise it inherits the device-wide access state.
+        // Resolution rule (see contract/): an app is installable when its install state says so
+        // (an entitlement-derived override wins over the catalog's own hint), otherwise it
+        // inherits the device-wide access state.
         access ??= new CatalogAccess();
-        IsLocked = app.Install is not null
-            ? app.Install.State == AppInstallState.Locked
+        var install = installOverride ?? app.Install;
+        IsLocked = install is not null
+            ? install.State == AppInstallState.Locked
             : access.State == StoreAccessState.Locked;
-        Offer = app.Install?.Offer ?? access.Offer;
+        Offer = install?.Offer ?? access.Offer;
     }
 
     public CatalogApp App { get; }

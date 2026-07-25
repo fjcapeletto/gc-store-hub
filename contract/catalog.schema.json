@@ -35,8 +35,8 @@
         },
         "reason": {
           "type": "string",
-          "enum": ["unrecognized-device", "no-store-access"],
-          "description": "Optional, only meaningful when state is locked. unrecognized-device: we don't know this machine. no-store-access: known device without store entitlement. Lets the client tailor the copy."
+          "enum": ["unrecognized-device", "no-store-access", "access-pending"],
+          "description": "Optional, only meaningful when state is locked. unrecognized-device: we don't know this machine. no-store-access: known device without store entitlement. access-pending: the device submitted an access request awaiting the owner's approval. Lets the client tailor the copy."
         },
         "offer": {
           "$ref": "#/$defs/offer",
@@ -94,6 +94,12 @@
           "enum": ["device-only", "account-required", "hybrid"],
           "default": "device-only",
           "description": "The identity the app declares it needs. Absent means device-only."
+        },
+        "protection": {
+          "type": "string",
+          "enum": ["sdk", "native"],
+          "default": "native",
+          "description": "Protection tier for the runtime gate (see device-authorization.md). sdk: runs in the hub runtime/SDK, payload stays controlled, strong protection, launch + mid-session revocation. native: OS-loaded native process, deterrence only, revocation at next launch. Absent means native (fail-safe: never over-claim protection)."
         },
         "install": {
           "$ref": "#/$defs/install",

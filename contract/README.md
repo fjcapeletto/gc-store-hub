@@ -107,3 +107,21 @@ rendering, never a decision the client is trusted to make.
 > Server-side is the source of truth. The client runs on untrusted machines and never
 > decides entitlements on its own. Do not add client-side gating a spoofed client could
 > skip.
+
+## Device authorization & entitlement
+
+The `access`/`install` states above are **render hints**. The authoritative machinery —
+the device-authorization handshake, the signed entitlement **lease**, package **delivery**
+with per-device key envelopes, protection tiers, and key rotation — is specified normatively
+in **[`device-authorization.md`](device-authorization.md)** (shapes in
+[`device-authorization.schema.json`](device-authorization.schema.json)).
+
+Two consequences reach into this catalog contract:
+
+- Each app declares a **`protection`** tier (`sdk` | `native`, default `native`) alongside
+  `identityMode`. It sets how strong the runtime gate is and whether revocation can take
+  effect mid-session (`sdk`) or only at next launch (`native`).
+- The hub is the **mandatory runtime gate**: app payloads are delivered encrypted and only
+  the hub, holding a valid lease, decrypts them to launch. The `access`/`install` hints must
+  stay consistent with the lease — never render `installable` what the lease says is
+  `revoked`.

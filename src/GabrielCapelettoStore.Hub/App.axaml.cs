@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.ViewModels;
 using GabrielCapelettoStore.Hub.Views;
@@ -51,6 +52,12 @@ public partial class App : Application
                 .GetSection(CatalogOptions.SectionName)
                 .Get<CatalogOptions>() ?? new CatalogOptions();
 
+            var entitlementOptions = new EntitlementOptions
+            {
+                BaseUrl = configuration.GetSection(EntitlementOptions.EntitlementSection)["BaseUrl"],
+                License = configuration.GetSection(EntitlementOptions.DeviceSection)["License"],
+            };
+
             var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
             ICatalogSource catalogSource = new HttpCatalogSource(httpClient, catalogOptions);
             ICatalogStateStore observationStore = new FileCatalogStateStore();
@@ -67,10 +74,16 @@ public partial class App : Application
                 fingerprintCollector = new NullFingerprintCollector();
             }
 
+            // Device identity: the hub-generated id + the license it presents (dev/config license
+            // seeds the store fallback so the current test flow keeps working).
+            var deviceIdentity = new DeviceIdentity(new FileDeviceStore(), fingerprintCollector, entitlementOptions.License);
+            IEntitlementService entitlement = new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);
+
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
             var viewModel = new MainViewModel(
-                catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore);
+                catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
+                entitlement);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 

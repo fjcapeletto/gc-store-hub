@@ -65,6 +65,14 @@
             <Setter Property="Background" Value="#F6D08F" />
         </Style>
 
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#0E1712" />
+            <Setter Property="Foreground" Value="{StaticResource SilkBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BoardBorderBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="MinWidth" Value="260" />
+        </Style>
+
         <Style Selector="Border.legH">
             <Setter Property="Width" Value="12" />
             <Setter Property="Height" Value="6" />
@@ -96,7 +104,7 @@
         <Border Background="{StaticResource BoardVignetteBrush}" IsHitTestVisible="False" ZIndex="-2" />
 
         <!-- ================= CATALOG ================= -->
-        <Grid IsVisible="{Binding !ShowSettings}" RowDefinitions="Auto,Auto,*" Margin="24,20">
+        <Grid IsVisible="{Binding ShowMainArea}" RowDefinitions="Auto,Auto,*" Margin="24,20">
 
             <!-- Header -->
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
@@ -130,6 +138,8 @@
                                 BoxShadow="0 0 8 0 #80E24B4A" IsVisible="{Binding !IsOnline}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Panel>
+                    <Button Classes="icon" Command="{Binding OpenAccessCommand}"
+                            ToolTip.Tip="Store access &amp; licensing" Content="🔑" />
                     <Button Classes="icon" Command="{Binding OpenSettingsCommand}"
                             ToolTip.Tip="Settings" Content="⚙" />
                 </StackPanel>
@@ -284,6 +294,75 @@
                 </ScrollViewer>
 
             </Panel>
+        </Grid>
+
+        <!-- ================= ACCESS / LICENSING ================= -->
+        <Grid IsVisible="{Binding ShowAccess}" RowDefinitions="Auto,*" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
+                <Button Classes="icon" Command="{Binding CloseAccessCommand}" Content="←" ToolTip.Tip="Back" />
+                <TextBlock Text="Store access" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1">
+                <StackPanel Spacing="14" MaxWidth="470" HorizontalAlignment="Left">
+
+                    <Border Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="This device" FontSize="12" Foreground="{StaticResource SilkMutedBrush}" />
+                            <TextBlock Text="{Binding DeviceId}" FontFamily="Cascadia Mono,Consolas,monospace"
+                                       FontSize="13" Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding HasLicense}" Background="{StaticResource BoardPanelBrush}"
+                            BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <TextBlock Text="This device is licensed. Your access syncs automatically."
+                                   Foreground="{StaticResource LedGreenBrush}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <Border IsVisible="{Binding !HasLicense}" Background="{StaticResource BoardPanelBrush}"
+                            BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Request store access" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{StaticResource SilkBrush}" />
+
+                            <StackPanel IsVisible="{Binding IsAccessPending}" Spacing="4">
+                                <TextBlock Text="Access requested — awaiting approval."
+                                           Foreground="{StaticResource LedAmberBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="We'll email your license key once it's approved." FontSize="12"
+                                           Foreground="{StaticResource SilkMutedBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel IsVisible="{Binding !IsAccessPending}" Spacing="8">
+                                <TextBox Watermark="Full name" Text="{Binding AccessName}" />
+                                <TextBox Watermark="Email" Text="{Binding AccessEmail}" />
+                                <TextBox Watermark="Phone (optional)" Text="{Binding AccessPhone}" />
+                                <Button Classes="unlock" Content="Request access"
+                                        Command="{Binding RequestAccessCommand}" HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding !HasLicense}" Background="{StaticResource BoardPanelBrush}"
+                            BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Have a license key?" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{StaticResource SilkBrush}" />
+                            <TextBlock Text="Paste the key from your approval email." FontSize="12"
+                                       Foreground="{StaticResource SilkMutedBrush}" />
+                            <TextBox Watermark="License key" Text="{Binding LicenseKeyInput}"
+                                     FontFamily="Cascadia Mono,Consolas,monospace" />
+                            <Button Classes="pill" Content="Activate"
+                                    Command="{Binding ActivateLicenseCommand}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock IsVisible="{Binding HasAccessMessage}" Text="{Binding AccessMessage}"
+                               Foreground="{StaticResource SilkDimBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
         <!-- ================= SETTINGS ================= -->
