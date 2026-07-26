@@ -22,6 +22,23 @@ as a versioned file here rather than in either side's memory. **Contract changes
 bilateral and land in this folder first**; the backend implements against it, the hub
 consumes it.
 
+## What is committed vs. what is not
+
+Two kinds of files live here, and only one kind is committed:
+
+- **Normative interface (committed & persisted)** — the ratified wire shapes and usage
+  mechanics, from the public hub side, exposing no server logic. Plain filenames
+  (`README.md`, `catalog.schema.json`, `device-authorization.md`, …). Contracts must be
+  persisted, so these belong to the repo.
+- **Negotiation vaivão (NEVER committed)** — the drafts / reviews / responses / ratifications /
+  requests / handoffs the two agent sessions exchange to reach agreement. Volatile: scoped to
+  the round, then they die. They are **git-ignored** by role suffix
+  (`*.draft.md`, `*.review.md`, `*.response.md`, `*.ratify.md`, `*.request.md`, `*.update.md`,
+  `*-handoff.md`, `*.hub-*.md`, `*.backend-*.md`) so they cannot be committed by accident.
+
+When a round closes, the **agreed content is folded into the normative doc** (which gets
+committed) and the negotiation drafts are discarded.
+
 ## The visibility model
 
 The catalog is **visible to every device**. What a purchased/entitled device gets is not

@@ -146,8 +146,8 @@
     "deliveryResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["appId", "version", "package", "keyEnvelope"],
-      "description": "Body of a successful POST /v1/delivery/{appId}. An ungranted device gets 402/403 with a catalog `offer` instead.",
+      "required": ["appId", "version", "package"],
+      "description": "Body of a successful POST /v1/delivery/{appId}. An ungranted device gets 402/403 with a catalog `offer` instead. `keyEnvelope` is OPTIONAL: absent = clear-phase cleartext package (hub downloads + verifies sha-256 + extracts, no decryption); present = the content key wrapped to this device (hardening pass — hub decrypts before install).",
       "properties": {
         "appId": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },

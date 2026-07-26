@@ -3,6 +3,19 @@
 # Public repository. Nothing secret is allowed to land here, ever.
 # ---------------------------------------------------------------------------
 
+# Contract negotiation vaivém — working files between the hub & server sessions.
+# NEVER committed: only ratified normative interfaces live in the repo (see contract/README.md).
+# These stay local for the round, then get deleted. Normative docs have plain names.
+contract/*.draft.md
+contract/*.review.md
+contract/*.response.md
+contract/*.ratify.md
+contract/*.request.md
+contract/*.update.md
+contract/*-handoff.md
+contract/*.hub-*.md
+contract/*.backend-*.md
+
 # Build output
 [Bb]in/
 [Oo]bj/
