@@ -287,12 +287,16 @@
                                                    Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center"
                                                    Opacity="{Binding IdentityOpacity}"
                                                    Margin="0,1,0,0" MaxWidth="126" TextTrimming="CharacterEllipsis" />
-                                        <Button Classes="pill" Content="{Binding InstallButtonText}"
-                                                Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
+                                        <Button Classes="pill" Content="{Binding PrimaryActionText}"
+                                                Command="{Binding PrimaryActionCommand}" IsEnabled="{Binding CanPrimary}"
                                                 IsVisible="{Binding ShowInstallButton}" Margin="0,8,0,0" />
                                         <Button Classes="unlock" Content="Unlock"
                                                 Command="{Binding OpenOfferCommand}" IsVisible="{Binding IsLocked}"
                                                 ToolTip.Tip="{Binding OfferHeadline}" Margin="0,8,0,0" />
+                                        <Button Content="Uninstall" IsVisible="{Binding ShowUninstall}"
+                                                Command="{Binding UninstallCommand}" Background="Transparent"
+                                                BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
+                                                FontSize="10" Padding="4,2" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

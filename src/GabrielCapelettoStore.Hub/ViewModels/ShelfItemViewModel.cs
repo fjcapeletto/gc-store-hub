@@ -13,6 +13,9 @@ namespace GabrielCapelettoStore.Hub.ViewModels;
 public sealed partial class ShelfItemViewModel : ObservableObject
 {
     private readonly Action<ShelfItemViewModel>? _installAction;
+    private readonly Action<ShelfItemViewModel>? _openAction;
+    private readonly Action<ShelfItemViewModel>? _updateAction;
+    private readonly Action<ShelfItemViewModel>? _uninstallAction;
     private readonly Action<string>? _openOfferAction;
     private readonly bool _isOnline;
 
@@ -25,7 +28,10 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         Action<ShelfItemViewModel>? installAction = null,
         CatalogAccess? access = null,
         Action<string>? openOfferAction = null,
-        CatalogInstall? installOverride = null)
+        CatalogInstall? installOverride = null,
+        Action<ShelfItemViewModel>? openAction = null,
+        Action<ShelfItemViewModel>? updateAction = null,
+        Action<ShelfItemViewModel>? uninstallAction = null)
     {
         App = app;
         InstalledVersion = installedVersion;
@@ -33,6 +39,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         Status = status;
         _isOnline = isOnline;
         _installAction = installAction;
+        _openAction = openAction;
+        _updateAction = updateAction;
+        _uninstallAction = uninstallAction;
         _openOfferAction = openOfferAction;
 
         // Resolution rule (see contract/): an app is installable when its install state says so
@@ -75,10 +84,11 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         : UpdateAvailable ? $"v{InstalledVersion} → v{AvailableVersion}"
         : $"v{AvailableVersion} · installed";
 
-    public string InstallButtonText =>
+    /// <summary>Primary action for this tile: Install (not installed) / Update (newer) / Open (up to date).</summary>
+    public string PrimaryActionText =>
         !IsInstalled ? "Install"
         : UpdateAvailable ? "Update"
-        : "Installed";
+        : "Open";
 
     /// <summary>
     /// Store-access state for this app, resolved from the per-app override or the
@@ -90,17 +100,37 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public CatalogOffer? Offer { get; }
 
     public bool ShowInstallButton => !IsLocked;
+    public bool ShowUninstall => IsInstalled && !IsLocked;
     public string OfferHeadline => Offer?.Headline ?? "Buy store access";
 
     /// <summary>Dims the app identity (chip + labels) when locked; the lock/CTA stay bright.</summary>
     public double IdentityOpacity => IsLocked ? 0.4 : 1.0;
 
-    /// <summary>Enabled only when installable, there is an action to take, AND the store is
-    /// reachable (installing/updating downloads from the backend — not possible offline).</summary>
-    public bool CanInstall => !IsLocked && (!IsInstalled || UpdateAvailable) && _isOnline;
+    /// <summary>Install and Update download from the server → need to be online. Open (already
+    /// installed, up to date) does not — its gate is the lease, checked on click.</summary>
+    private bool NeedsOnline => !IsInstalled || UpdateAvailable;
+
+    public bool CanPrimary => !IsLocked && (!NeedsOnline || _isOnline);
 
     [RelayCommand]
-    private void Install() => _installAction?.Invoke(this);
+    private void PrimaryAction()
+    {
+        if (!IsInstalled)
+        {
+            _installAction?.Invoke(this);
+        }
+        else if (UpdateAvailable)
+        {
+            _updateAction?.Invoke(this);
+        }
+        else
+        {
+            _openAction?.Invoke(this);
+        }
+    }
+
+    [RelayCommand]
+    private void Uninstall() => _uninstallAction?.Invoke(this);
 
     [RelayCommand]
     private void OpenOffer()

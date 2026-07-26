@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.Update;
@@ -23,6 +24,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly ICatalogCache _cache;
     private readonly IEntitlementService _entitlement;
     private readonly IUpdateService _updateService;
+    private readonly IDeliveryService _delivery;
+    private readonly IAppInstaller _installer;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -38,7 +41,9 @@ public partial class MainViewModel : ViewModelBase
         IDeviceFingerprintCollector fingerprintCollector,
         IIdentityBaselineStore baselineStore,
         IEntitlementService entitlement,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IDeliveryService delivery,
+        IAppInstaller installer)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
@@ -46,6 +51,8 @@ public partial class MainViewModel : ViewModelBase
         _cache = cache;
         _entitlement = entitlement;
         _updateService = updateService;
+        _delivery = delivery;
+        _installer = installer;
         _updateService.StateChanged += OnUpdateStateChanged;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
@@ -78,7 +85,7 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
         new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
-        new NullEntitlementService(), new NullUpdateService())
+        new NullEntitlementService(), new NullUpdateService(), new NullDeliveryService(), new NullAppInstaller())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -375,7 +382,7 @@ public partial class MainViewModel : ViewModelBase
             var noveltySince = obs?.NoveltySince ?? now;
             var fresh = now - noveltySince <= FreshnessWindow;
 
-            var installedVersion = _install.Installed.TryGetValue(app.Id, out var iv) ? iv : null;
+            var installedVersion = _install.Apps.TryGetValue(app.Id, out var iv) ? iv.Version : null;
             var isInstalled = installedVersion is not null;
             var updateAvailable = isInstalled && IsNewer(app.Version, installedVersion!);
 
@@ -407,8 +414,8 @@ public partial class MainViewModel : ViewModelBase
             }
 
             var item = new ShelfItemViewModel(
-                app, installedVersion, updateAvailable, status, IsOnline, InstallApp, access, OpenOffer,
-                EntitlementOverride(app.Id));
+                app, installedVersion, updateAvailable, status, IsOnline, OnInstall, access, OpenOffer,
+                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnUninstall);
             items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')
@@ -508,12 +515,129 @@ public partial class MainViewModel : ViewModelBase
         return new CatalogInstall { State = AppInstallState.Locked };
     }
 
-    /// <summary>Stub install: records the installed version only (no real installation yet), then re-renders.</summary>
-    private void InstallApp(ShelfItemViewModel item)
+    // Tile actions (see contract/delivery-lifecycle). Install/Update pull the package from the
+    // server and install it locally; Open gates on the lease then launches; Uninstall removes it.
+    private void OnInstall(ShelfItemViewModel item) => _ = InstallOrUpdateAsync(item);
+    private void OnUpdate(ShelfItemViewModel item) => _ = InstallOrUpdateAsync(item);
+    private void OnOpen(ShelfItemViewModel item) => LaunchApp(item);
+    private void OnUninstall(ShelfItemViewModel item) => UninstallApp(item);
+
+    private async Task InstallOrUpdateAsync(ShelfItemViewModel item)
     {
-        _install.Installed[item.Id] = item.AvailableVersion;
+        if (!_delivery.IsConfigured)
+        {
+            return;
+        }
+
+        SyncStatus = $"Installing {item.Name}…";
+        try
+        {
+            var outcome = await _delivery.RequestAsync(item.Id);
+            switch (outcome.Status)
+            {
+                case DeliveryStatus.Ready:
+                    var installed = await _installer.InstallAsync(outcome.Response!);
+                    _install.Apps[item.Id] = new InstalledEntry
+                    {
+                        Version = installed.Version,
+                        EntryExe = installed.EntryExe,
+                        InstallDir = installed.InstallDir,
+                    };
+                    _installStore.Save(_install);
+                    SyncStatus = $"{item.Name} installed";
+                    Rebuild(DateTimeOffset.UtcNow);
+                    break;
+
+                case DeliveryStatus.Denied:
+                    SyncStatus = $"{item.Name}: access denied";
+                    break;
+                case DeliveryStatus.NoPackage:
+                    SyncStatus = $"{item.Name}: no package published yet";
+                    break;
+                default:
+                    SyncStatus = "Store server offline";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncStatus = $"Install failed: {ex.Message}";
+        }
+    }
+
+    private void LaunchApp(ShelfItemViewModel item)
+    {
+        if (!_install.Apps.TryGetValue(item.Id, out var entry))
+        {
+            return;
+        }
+
+        if (!MayLaunch(item.Id))
+        {
+            SyncStatus = $"{item.Name}: access expired or revoked";
+            return;
+        }
+
+        try
+        {
+            _installer.Launch(new InstalledApp
+            {
+                AppId = item.Id,
+                Version = entry.Version,
+                EntryExe = entry.EntryExe,
+                InstallDir = entry.InstallDir,
+            });
+        }
+        catch (Exception ex)
+        {
+            SyncStatus = $"Couldn't open {item.Name}: {ex.Message}";
+        }
+    }
+
+    private void UninstallApp(ShelfItemViewModel item)
+    {
+        try
+        {
+            _installer.Uninstall(item.Id);
+        }
+        catch
+        {
+            // Best effort — even if the folder is partly locked, drop the record so the UI recovers.
+        }
+
+        _install.Apps.Remove(item.Id);
         _installStore.Save(_install);
         Rebuild(DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// The launch gate: the app's entitlement in the current lease must be granted and within
+    /// validity (±5 min skew). No verified lease + a configured server ⇒ refuse (fail-closed;
+    /// offline lease-grace is a follow-up). Catalog-only mode (no server) ⇒ allow.
+    /// </summary>
+    private bool MayLaunch(string appId)
+    {
+        var lease = _authorize?.Lease;
+        if (lease is null)
+        {
+            return !_entitlement.IsConfigured;
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const long skewSeconds = 300;
+
+        foreach (var e in lease.Entitlements)
+        {
+            if (!string.Equals(e.AppId, appId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return string.Equals(e.State, "granted", StringComparison.Ordinal)
+                && (e.NotAfter is null || now <= e.NotAfter.Value + skewSeconds);
+        }
+
+        return false; // granted device, but no entitlement for this app
     }
 
     [RelayCommand]

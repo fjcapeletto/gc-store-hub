@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using GabrielCapelettoStore.Hub.Catalog;
+using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.Update;
@@ -75,6 +76,8 @@ public partial class App : Application
             // seeds the store fallback so the current test flow keeps working).
             var deviceIdentity = new DeviceIdentity(new FileDeviceStore(), fingerprintCollector, entitlementOptions.License);
             IEntitlementService entitlement = new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);
+            IDeliveryService delivery = new HttpDeliveryService(httpClient, entitlementOptions, deviceIdentity);
+            IAppInstaller installer = new AppInstaller(httpClient);
 
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
@@ -83,7 +86,7 @@ public partial class App : Application
 
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
-                entitlement, _updateService);
+                entitlement, _updateService, delivery, installer);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 

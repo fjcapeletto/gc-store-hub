@@ -69,22 +69,7 @@ public sealed class HttpEntitlementService : IEntitlementService
             return AuthorizeOutcome.Offline("No entitlement endpoint configured.");
         }
 
-        var request = new AuthorizeRequest
-        {
-            Claim = new DeviceClaim
-            {
-                DeviceId = _device.DeviceId,
-                License = _device.License, // optional — omitted when null; a pending device still authorizes
-                Fingerprint = _device.FingerprintClaim(),
-            },
-            Capabilities = new Capabilities
-            {
-                Schemes = ["fingerprint-wrap-v1"],
-                CanSealTpm = false,
-                HasTpmEk = false,
-                TrustedKeyIds = TrustAnchors.KeyIds,
-            },
-        };
+        var request = new AuthorizeRequest { Claim = ClaimFactory.Claim(_device), Capabilities = ClaimFactory.Capabilities() };
 
         try
         {
