@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using GabrielCapelettoStore.Hub.Icons;
 using GabrielCapelettoStore.Hub.Notifications;
 
 namespace GabrielCapelettoStore.Hub.Web;
@@ -30,13 +32,14 @@ public sealed class WebManager
     private readonly IWebService _web;
     private readonly IWebStore _store;
     private readonly IToastService _toast;
+    private readonly IAppIconCache _images;
     private readonly WebState _state;
     private readonly DispatcherTimer _pollTimer;
 
     // Per-app one-by-one emission: each app drips its own queue at its own cadence.
     private readonly Dictionary<string, Emitter> _emitters = new(StringComparer.Ordinal);
 
-    private readonly record struct PendingToast(string Id, string Title, string Url);
+    private readonly record struct PendingToast(string Id, string Title, string Url, string? ImageUrl);
 
     private sealed class Emitter
     {
@@ -48,11 +51,12 @@ public sealed class WebManager
     /// <summary>Raised when subscription/inbox/mode state changes (so the shelf/inbox can refresh).</summary>
     public event Action? Changed;
 
-    public WebManager(IWebService web, IWebStore store, IToastService toast)
+    public WebManager(IWebService web, IWebStore store, IToastService toast, IAppIconCache images)
     {
         _web = web;
         _store = store;
         _toast = toast;
+        _images = images;
         _state = store.Load();
         _pollTimer = new DispatcherTimer { Interval = PollInterval };
         _pollTimer.Tick += async (_, _) => await PollAllAsync();
@@ -227,7 +231,10 @@ public sealed class WebManager
         app.Inbox = present
             .OrderByDescending(i => ParseTime(i.PublishedAt) ?? DateTimeOffset.MinValue)
             .Take(InboxCap)
-            .Select(i => new WebInboxItem { Id = i.Id, Title = i.Title, Url = i.Url, PublishedAt = i.PublishedAt })
+            .Select(i => new WebInboxItem
+            {
+                Id = i.Id, Title = i.Title, Url = i.Url, PublishedAt = i.PublishedAt, ImageUrl = i.ImageUrl,
+            })
             .ToList();
 
         // Unseen = present, not already surfaced, and not already queued this session.
@@ -292,7 +299,7 @@ public sealed class WebManager
         {
             if (em.Keys.Add(i.Id))
             {
-                em.Queue.Add(new PendingToast(i.Id, i.Title, i.Url));
+                em.Queue.Add(new PendingToast(i.Id, i.Title, i.Url, i.ImageUrl));
             }
         }
 
@@ -336,13 +343,26 @@ public sealed class WebManager
         // Respect a mid-drain switch to silent / an unsubscribe: keep it seen, skip the toast.
         if (app.Subscribed && app.DeliveryMode != WebDeliveryMode.Silent)
         {
-            _toast.Show(p.Title, DisplayName(appId), () => OpenLink(p.Url));
+            _ = ShowToastAsync(appId, p);
         }
 
         if (em.Queue.Count == 0)
         {
             StopTimer(em);
         }
+    }
+
+    // Fetch the link-preview thumbnail (if any) first, then raise the toast with it. Fire-and-forget so
+    // the queue/timer mechanics stay synchronous; a missing/slow image just yields a text-only toast.
+    private async Task ShowToastAsync(string appId, PendingToast p)
+    {
+        Bitmap? image = null;
+        if (!string.IsNullOrWhiteSpace(p.ImageUrl))
+        {
+            image = await _images.GetOrFetchAsync(p.ImageUrl!).ConfigureAwait(false);
+        }
+
+        _toast.Show(p.Title, DisplayName(appId), () => OpenLink(p.Url), image);
     }
 
     private void DropPending(string appId)

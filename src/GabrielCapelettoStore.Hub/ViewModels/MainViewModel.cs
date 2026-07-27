@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -98,7 +99,8 @@ public partial class MainViewModel : ViewModelBase
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
         new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
         new NullEntitlementService(), new NullUpdateService(), new NullDeliveryService(), new NullAppInstaller(),
-        new WebManager(new NullWebService(), new NullWebStore(), new NullToastService()), new NullAppIconCache())
+        new WebManager(new NullWebService(), new NullWebStore(), new NullToastService(), new NullAppIconCache()),
+        new NullAppIconCache())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -139,16 +141,24 @@ public partial class MainViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowMainArea))]
     public partial bool ShowInbox { get; set; }
 
-    /// <summary>Whether a web app's delivery-config modal is showing instead of the catalog.</summary>
+    /// <summary>Whether a per-tile Settings panel is showing instead of the catalog.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowMainArea))]
-    public partial bool ShowWebConfig { get; set; }
+    public partial bool ShowTileSettings { get; set; }
 
-    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox / Config) is open.</summary>
-    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox && !ShowWebConfig;
+    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox / Tile settings) is open.</summary>
+    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox && !ShowTileSettings;
 
     // --- Web app inbox (type: web, e.g. GC Deals) ---
     [ObservableProperty] public partial string InboxTitle { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InboxHasIcon))]
+    public partial Bitmap? InboxIcon { get; set; }
+
+    [ObservableProperty] public partial string? InboxGlyphKey { get; set; }
+    public bool InboxHasIcon => InboxIcon is not null;
+
     private string _inboxAppId = "";
     public ObservableCollection<InboxItemViewModel> InboxItems { get; } = [];
 
@@ -169,16 +179,53 @@ public partial class MainViewModel : ViewModelBase
     {
         _inboxAppId = appId;
         InboxTitle = appName;
+
+        // Give the inbox the web app's own identity (same icon as its shelf tile).
+        var app = _manifest?.Apps.FirstOrDefault(a => string.Equals(a.Id, appId, StringComparison.Ordinal));
+        InboxGlyphKey = app?.Icon;
+        InboxIcon = app?.IconUrl is { } iconUrl ? _icons.Get(iconUrl) : null;
+
         LoadInbox(appId);
         ShowSettings = false;
         ShowAccess = false;
-        ShowWebConfig = false;
+        ShowTileSettings = false;
         ShowInbox = true;
     }
 
-    // --- Web app delivery config (how new deals notify: one-by-one / grouped / silent + cadence) ---
-    [ObservableProperty] public partial string WebConfigTitle { get; set; } = "";
+    // --- Per-tile Settings (web: status + subscribe/unsubscribe + delivery; app: status + uninstall) ---
+    [ObservableProperty] public partial string SettingsTitle { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SettingsHasIcon))]
+    public partial Bitmap? SettingsIcon { get; set; }
+
+    [ObservableProperty] public partial string? SettingsGlyphKey { get; set; }
+    public bool SettingsHasIcon => SettingsIcon is not null;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SettingsIsApp))]
+    [NotifyPropertyChangedFor(nameof(ShowDeliverySection))]
+    [NotifyPropertyChangedFor(nameof(ShowSubscribeButton))]
+    [NotifyPropertyChangedFor(nameof(ShowUnsubscribeButton))]
+    public partial bool SettingsIsWeb { get; set; }
+    public bool SettingsIsApp => !SettingsIsWeb;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDeliverySection))]
+    [NotifyPropertyChangedFor(nameof(ShowSubscribeButton))]
+    [NotifyPropertyChangedFor(nameof(ShowUnsubscribeButton))]
+    public partial bool SettingsSubscribed { get; set; }
+
+    [ObservableProperty] public partial string SettingsStatus { get; set; } = "";
+    [ObservableProperty] public partial bool SettingsCanUninstall { get; set; }
+
+    /// <summary>Delivery options apply only to a subscribed web app.</summary>
+    public bool ShowDeliverySection => SettingsIsWeb && SettingsSubscribed;
+    public bool ShowSubscribeButton => SettingsIsWeb && !SettingsSubscribed;
+    public bool ShowUnsubscribeButton => SettingsIsWeb && SettingsSubscribed;
+
     private string _configAppId = "";
+    private ShelfItemViewModel? _settingsItem;
     public ObservableCollection<WebDeliveryOptionViewModel> WebConfigOptions { get; } = [];
 
     /// <summary>Cadence (seconds) between individual toasts; bound to the slider. Clamped to the range.</summary>
@@ -194,12 +241,56 @@ public partial class MainViewModel : ViewModelBase
     public bool ShowCadence => WebConfigOptions.Any(o => o.IsSelected &&
         o.Mode is WebDeliveryMode.IndividualOldestFirst or WebDeliveryMode.IndividualNewestFirst);
 
-    private void OpenWebConfig(string appId, string appName)
+    private void OnOpenTileSettings(ShelfItemViewModel item)
     {
-        _configAppId = appId;
-        WebConfigTitle = appName;
-        WebConfigIntervalSeconds = _web.GetIntervalSeconds(appId);
+        _settingsItem = item;
+        _configAppId = item.Id;
+        SettingsTitle = item.Name;
 
+        var app = _manifest?.Apps.FirstOrDefault(a => string.Equals(a.Id, item.Id, StringComparison.Ordinal));
+        SettingsGlyphKey = app?.Icon;
+        SettingsIcon = app?.IconUrl is { } u ? _icons.Get(u) : null;
+
+        SettingsIsWeb = item.IsWeb;
+        RefreshSettingsState();
+
+        ShowSettings = false;
+        ShowAccess = false;
+        ShowInbox = false;
+        ShowTileSettings = true;
+    }
+
+    private void RefreshSettingsState()
+    {
+        if (_settingsItem is null)
+        {
+            return;
+        }
+
+        if (SettingsIsWeb)
+        {
+            SettingsSubscribed = _web.IsSubscribed(_configAppId);
+            SettingsStatus = _web.IsRevoked(_configAppId) ? "Free · removed from this stream" : "Free";
+            SettingsCanUninstall = false;
+            BuildDeliveryOptions(_configAppId);
+        }
+        else
+        {
+            SettingsSubscribed = false;
+            SettingsStatus = _settingsItem.IsInstalled
+                ? $"Installed · v{_settingsItem.InstalledVersion}"
+                : $"Available · v{_settingsItem.AvailableVersion}";
+            SettingsCanUninstall = _settingsItem.IsInstalled;
+            WebConfigOptions.Clear();
+        }
+
+        OnPropertyChanged(nameof(ShowDeliverySection));
+        OnPropertyChanged(nameof(ShowCadence));
+    }
+
+    private void BuildDeliveryOptions(string appId)
+    {
+        WebConfigIntervalSeconds = _web.GetIntervalSeconds(appId);
         var current = _web.GetMode(appId);
         WebConfigOptions.Clear();
         foreach (var (mode, label, description) in DeliveryOptionCatalog)
@@ -207,12 +298,6 @@ public partial class MainViewModel : ViewModelBase
             WebConfigOptions.Add(new WebDeliveryOptionViewModel(
                 mode, label, description, selected: mode == current, SelectWebConfigOption));
         }
-
-        OnPropertyChanged(nameof(ShowCadence));
-        ShowSettings = false;
-        ShowAccess = false;
-        ShowInbox = false;
-        ShowWebConfig = true;
     }
 
     private void SelectWebConfigOption(WebDeliveryOptionViewModel chosen)
@@ -226,7 +311,37 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void SaveWebConfig()
+    private void SubscribeFromSettings()
+    {
+        if (SettingsIsWeb && _settingsItem is not null)
+        {
+            _web.Subscribe(_configAppId, _settingsItem.Name);
+            RefreshSettingsState();
+        }
+    }
+
+    [RelayCommand]
+    private void UnsubscribeFromSettings()
+    {
+        if (SettingsIsWeb)
+        {
+            _web.Unsubscribe(_configAppId);
+            RefreshSettingsState();
+        }
+    }
+
+    [RelayCommand]
+    private void UninstallFromSettings()
+    {
+        if (_settingsItem is { IsInstalled: true } item)
+        {
+            OnUninstall(item);
+            ShowTileSettings = false;
+        }
+    }
+
+    [RelayCommand]
+    private void SaveDeliveryConfig()
     {
         var selected = WebConfigOptions.FirstOrDefault(o => o.IsSelected);
         if (selected is not null && !string.IsNullOrEmpty(_configAppId))
@@ -234,8 +349,6 @@ public partial class MainViewModel : ViewModelBase
             _web.SetMode(_configAppId, selected.Mode);
             _web.SetIntervalSeconds(_configAppId, (int)Math.Round(WebConfigIntervalSeconds));
         }
-
-        ShowWebConfig = false;
     }
 
     private static string FormatInterval(int seconds)
@@ -258,7 +371,7 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void CloseWebConfig() => ShowWebConfig = false;
+    private void CloseTileSettings() => ShowTileSettings = false;
 
     private static readonly (WebDeliveryMode Mode, string Label, string Description)[] DeliveryOptionCatalog =
     [
@@ -277,7 +390,9 @@ public partial class MainViewModel : ViewModelBase
         InboxItems.Clear();
         foreach (var item in _web.Inbox(appId))
         {
-            InboxItems.Add(new InboxItemViewModel(item.Title, item.Url, item.PublishedAt, _web.OpenLink));
+            InboxItems.Add(new InboxItemViewModel(
+                item.Title, item.Url, item.PublishedAt, item.ImageUrl, _web.OpenLink,
+                url => _icons.GetOrFetchAsync(url)));
         }
     }
 
@@ -306,6 +421,96 @@ public partial class MainViewModel : ViewModelBase
         || _entitlement.AccessRequested;
 
     public ObservableCollection<ShelfItemViewModel> Apps { get; } = [];
+
+    // --- Paged shelf (phone-style 3×3 pages with dots) ---
+    private const int PageSize = 9;
+    public ObservableCollection<ShelfPageViewModel> Pages { get; } = [];
+    public ObservableCollection<PageDotViewModel> PageDots { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPrevPage))]
+    [NotifyPropertyChangedFor(nameof(CanNextPage))]
+    public partial int CurrentPageIndex { get; set; }
+
+    partial void OnCurrentPageIndexChanged(int value) => UpdateDots();
+
+    public int PageCount => Pages.Count;
+    public bool HasMultiplePages => Pages.Count > 1;
+    public bool CanPrevPage => CurrentPageIndex > 0;
+    public bool CanNextPage => CurrentPageIndex < Pages.Count - 1;
+
+    private void RebuildPages(List<ShelfItemViewModel> items)
+    {
+        Pages.Clear();
+        for (var i = 0; i < items.Count; i += PageSize)
+        {
+            Pages.Add(new ShelfPageViewModel(items.GetRange(i, Math.Min(PageSize, items.Count - i))));
+        }
+
+        PageDots.Clear();
+        for (var p = 0; p < Pages.Count; p++)
+        {
+            PageDots.Add(new PageDotViewModel(p, GoToPage));
+        }
+
+        if (CurrentPageIndex >= Pages.Count)
+        {
+            CurrentPageIndex = Math.Max(0, Pages.Count - 1);
+        }
+
+        UpdateDots();
+        OnPropertyChanged(nameof(PageCount));
+        OnPropertyChanged(nameof(HasMultiplePages));
+        OnPropertyChanged(nameof(CanPrevPage));
+        OnPropertyChanged(nameof(CanNextPage));
+    }
+
+    private void UpdateDots()
+    {
+        foreach (var dot in PageDots)
+        {
+            dot.IsActive = dot.Index == CurrentPageIndex;
+        }
+    }
+
+    private void GoToPage(int index)
+    {
+        if (index >= 0 && index < Pages.Count)
+        {
+            CurrentPageIndex = index;
+        }
+    }
+
+    [RelayCommand]
+    private void NextPage()
+    {
+        if (CanNextPage)
+        {
+            CurrentPageIndex++;
+        }
+    }
+
+    [RelayCommand]
+    private void PrevPage()
+    {
+        if (CanPrevPage)
+        {
+            CurrentPageIndex--;
+        }
+    }
+
+    /// <summary>Turn a page with the mouse wheel / horizontal scroll (called from the view).</summary>
+    public void TurnPage(bool forward)
+    {
+        if (forward)
+        {
+            NextPage();
+        }
+        else
+        {
+            PrevPage();
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowCatalog))]
@@ -573,11 +778,10 @@ public partial class MainViewModel : ViewModelBase
                     OfferHeadline: _web.RevokedHeadline(app.Id),
                     OfferUrl: _web.RevokedUrl(app.Id),
                     Subscribe: () => _web.Subscribe(app.Id, app.Name),
-                    Unsubscribe: () => _web.Unsubscribe(app.Id),
-                    OpenInbox: () => OpenWebInbox(app.Id, app.Name),
-                    OpenConfig: () => OpenWebConfig(app.Id, app.Name));
+                    OpenInbox: () => OpenWebInbox(app.Id, app.Name));
                 var webIcon = app.IconUrl is { } wu ? _icons.Get(wu) : null;
-                items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline, web: web, icon: webIcon));
+                items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline,
+                    web: web, icon: webIcon, openSettingsAction: OnOpenTileSettings));
                 signature.Append(app.Id).Append("|web|")
                          .Append(web.Subscribed ? 'S' : 'u').Append(web.Revoked ? 'R' : '_')
                          .Append(webIcon is null ? '_' : 'i').Append(';');
@@ -622,7 +826,7 @@ public partial class MainViewModel : ViewModelBase
             var appIcon = app.IconUrl is { } au ? _icons.Get(au) : null;
             var item = new ShelfItemViewModel(
                 app, installedVersion, updateAvailable, status, IsOnline, OnInstall, access, OpenOffer,
-                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnUninstall, icon: appIcon);
+                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnOpenTileSettings, icon: appIcon);
             items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')
@@ -647,6 +851,8 @@ public partial class MainViewModel : ViewModelBase
         {
             Apps.Add(item);
         }
+
+        RebuildPages(items);
     }
 
     /// <summary>The "Unlock" CTA on a locked app opens the in-hub access / licensing panel.</summary>
@@ -863,7 +1069,7 @@ public partial class MainViewModel : ViewModelBase
     {
         DeviceIdentity.Load();
         ShowInbox = false;
-        ShowWebConfig = false;
+        ShowTileSettings = false;
         ShowAccess = false;
         ShowSettings = true;
     }
@@ -877,7 +1083,7 @@ public partial class MainViewModel : ViewModelBase
         AccessMessage = "";
         ShowSettings = false;
         ShowInbox = false;
-        ShowWebConfig = false;
+        ShowTileSettings = false;
         ShowAccess = true;
     }
 

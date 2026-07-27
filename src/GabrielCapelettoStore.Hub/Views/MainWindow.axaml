@@ -10,8 +10,8 @@
         x:Class="GabrielCapelettoStore.Hub.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/gcstore.ico"
-        Width="900" Height="600"
-        MinWidth="640" MinHeight="420"
+        Width="560" Height="624"
+        MinWidth="520" MinHeight="520"
         Background="{StaticResource BoardGradientBrush}"
         Title="Gabriel Capeletto Store">
 
@@ -113,7 +113,7 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StoreName}" FontSize="24" FontWeight="SemiBold"
-                               Foreground="{StaticResource SilkBrush}" />
+                               Foreground="{StaticResource SilkBrush}" TextTrimming="CharacterEllipsis" />
                     <StackPanel Orientation="Horizontal" Spacing="7">
                         <TextBlock Text="your device's software store" FontSize="12"
                                    Foreground="{StaticResource SilkMutedBrush}"
@@ -126,30 +126,35 @@
                     <TextBlock Text="{Binding OfflineNotice}" IsVisible="{Binding ShowOfflineNotice}"
                                FontSize="12" Foreground="{StaticResource LedAmberBrush}" Margin="0,3,0,0" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <!-- Self-update chip: shows while downloading; becomes a Restart button when ready. -->
-                    <Button Classes="unlock" Content="{Binding UpdateStatusText}"
-                            IsVisible="{Binding ShowUpdate}" IsEnabled="{Binding IsUpdateReady}"
-                            Command="{Binding RestartUpdateCommand}" FontSize="11" Padding="12,3"
-                            ToolTip.Tip="Restart to apply the update" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                        <!-- Self-update chip: shows while downloading; becomes a Restart button when ready. -->
+                        <Button Classes="unlock" Content="{Binding UpdateStatusText}"
+                                IsVisible="{Binding ShowUpdate}" IsEnabled="{Binding IsUpdateReady}"
+                                Command="{Binding RestartUpdateCommand}" FontSize="11" Padding="12,3"
+                                ToolTip.Tip="Restart to apply the update" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <Button Classes="icon" Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
+                                ToolTip.Tip="Check for updates" Content="⟳" />
+                        <!-- Board LED: green = online, red = offline -->
+                        <Panel Width="30" VerticalAlignment="Center" ToolTip.Tip="{Binding ConnectivityLabel}">
+                            <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedGreenBrush}"
+                                    Classes="ledPulse" BoxShadow="0 0 8 0 #8027E08A" IsVisible="{Binding IsOnline}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedRedBrush}"
+                                    BoxShadow="0 0 8 0 #80E24B4A" IsVisible="{Binding !IsOnline}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Panel>
+                        <Button Classes="icon" Command="{Binding OpenAccessCommand}"
+                                ToolTip.Tip="Store access &amp; licensing" Content="🔑" />
+                        <Button Classes="icon" Command="{Binding OpenSettingsCommand}"
+                                ToolTip.Tip="Settings" Content="⚙" />
+                    </StackPanel>
+
+                    <!-- Transient status (sync / install result) — its own line, never competes with the title. -->
                     <TextBlock Text="{Binding SyncStatus}" IsVisible="{Binding HasSyncStatus}"
                                FontSize="12" Foreground="{StaticResource SilkMutedBrush}"
-                               VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <Button Classes="icon" Command="{Binding SyncCommand}" IsEnabled="{Binding !IsRefreshing}"
-                            ToolTip.Tip="Check for updates" Content="⟳" />
-                    <!-- Board LED: green = online, red = offline -->
-                    <Panel Width="30" VerticalAlignment="Center" ToolTip.Tip="{Binding ConnectivityLabel}">
-                        <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedGreenBrush}"
-                                Classes="ledPulse" BoxShadow="0 0 8 0 #8027E08A" IsVisible="{Binding IsOnline}"
-                                HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        <Border Width="12" Height="12" CornerRadius="6" Background="{StaticResource LedRedBrush}"
-                                BoxShadow="0 0 8 0 #80E24B4A" IsVisible="{Binding !IsOnline}"
-                                HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Panel>
-                    <Button Classes="icon" Command="{Binding OpenAccessCommand}"
-                            ToolTip.Tip="Store access &amp; licensing" Content="🔑" />
-                    <Button Classes="icon" Command="{Binding OpenSettingsCommand}"
-                            ToolTip.Tip="Settings" Content="⚙" />
+                               HorizontalAlignment="Right" MaxWidth="240"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SyncStatus}" />
                 </StackPanel>
             </Grid>
 
@@ -194,22 +199,63 @@
                                FontSize="12" Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center" />
                 </StackPanel>
 
-                <ScrollViewer IsVisible="{Binding ShowCatalog}">
-                    <Grid HorizontalAlignment="Left">
-                        <controls:ChipTraceOverlay ItemCount="{Binding Apps.Count}" ZIndex="-1"
-                                                   IsHitTestVisible="False"
-                                                   Width="{Binding #Items.Bounds.Width}"
-                                                   Height="{Binding #Items.Bounds.Height}" />
-                        <ItemsControl x:Name="Items" ItemsSource="{Binding Apps}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ShelfItemViewModel">
-                                <Border Width="150" Height="196" Margin="0" Padding="6,10" CornerRadius="12">
+                <Grid IsVisible="{Binding ShowCatalog}" RowDefinitions="*,Auto">
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+                        <Button Grid.Column="0" Classes="icon" Content="‹" FontSize="24"
+                                Command="{Binding PrevPageCommand}" IsEnabled="{Binding CanPrevPage}"
+                                IsVisible="{Binding HasMultiplePages}" VerticalAlignment="Center" />
+
+                        <Carousel Grid.Column="1" x:Name="ShelfPager" ItemsSource="{Binding Pages}"
+                                  SelectedIndex="{Binding CurrentPageIndex, Mode=TwoWay}"
+                                  VerticalAlignment="Top" HorizontalAlignment="Center"
+                                  PointerWheelChanged="ShelfPager_PointerWheelChanged">
+                            <Carousel.PageTransition>
+                                <PageSlide Duration="0:0:0.22" Orientation="Horizontal" />
+                            </Carousel.PageTransition>
+                            <Carousel.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ShelfPageViewModel">
+                                    <Grid HorizontalAlignment="Center">
+                                        <controls:ChipTraceOverlay ItemCount="{Binding Items.Count}" ZIndex="-1"
+                                                                   IsHitTestVisible="False"
+                                                                   Width="{Binding #PageItems.Bounds.Width}"
+                                                                   Height="{Binding #PageItems.Bounds.Height}" />
+                                        <ItemsControl x:Name="PageItems" ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <UniformGrid Columns="3" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ShelfItemViewModel">
+                                <Border Width="150" Height="148" Margin="0" Padding="6,8" CornerRadius="12">
+                                    <Panel>
                                     <StackPanel HorizontalAlignment="Center">
+                                        <Button Classes="tileIcon" Command="{Binding IconActionCommand}"
+                                                IsEnabled="{Binding IconEnabled}" Background="Transparent"
+                                                BorderThickness="0" Padding="0" HorizontalAlignment="Center">
+                                            <Button.Styles>
+                                                <Style Selector="Button.tileIcon"><Setter Property="Cursor" Value="Hand" /></Style>
+                                                <Style Selector="Button.tileIcon:disabled"><Setter Property="Cursor" Value="Arrow" /></Style>
+                                                <Style Selector="Button.tileIcon /template/ ContentPresenter#PART_ContentPresenter">
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Setter Property="BorderThickness" Value="0" />
+                                                </Style>
+                                                <Style Selector="Button.tileIcon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                </Style>
+                                                <Style Selector="Button.tileIcon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                </Style>
+                                                <Style Selector="Button.tileIcon Border.hoverLabel">
+                                                    <Setter Property="Opacity" Value="0" />
+                                                    <Setter Property="Transitions">
+                                                        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12" /></Transitions>
+                                                    </Setter>
+                                                </Style>
+                                                <Style Selector="Button.tileIcon:pointerover Border.hoverLabel">
+                                                    <Setter Property="Opacity" Value="1" />
+                                                </Style>
+                                            </Button.Styles>
                                         <Panel Width="110" Height="104">
                                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Opacity="{Binding IdentityOpacity}"
@@ -287,39 +333,83 @@
                                                              Margin="0,3,0,0" />
                                                 </Panel>
                                             </Viewbox>
-                                        </Panel>
 
-                                        <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource SilkBrush}"
+                                            <!-- Hover: the icon is the primary affordance; reveal the verb on pointer over. -->
+                                            <Border Classes="hoverLabel" Width="72" Height="72" CornerRadius="15"
+                                                    Background="#DA0F1712" IsHitTestVisible="False"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding IconHoverText}" Foreground="{StaticResource SilkBrush}"
+                                                           FontSize="13" FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                        </Panel>
+                                        </Button>
+
+                                        <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{StaticResource SilkBrush}"
                                                    Opacity="{Binding IdentityOpacity}"
-                                                   HorizontalAlignment="Center" Margin="0,9,0,0" MaxWidth="126"
+                                                   HorizontalAlignment="Center" Margin="0,3,0,0" MaxWidth="130"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding VersionSubline}" FontSize="11"
-                                                   Foreground="{StaticResource SilkMutedBrush}" HorizontalAlignment="Center"
-                                                   Opacity="{Binding IdentityOpacity}"
-                                                   Margin="0,1,0,0" MaxWidth="126" TextTrimming="CharacterEllipsis" />
-                                        <Button Classes="pill" Content="{Binding PrimaryActionText}"
-                                                Command="{Binding PrimaryActionCommand}" IsEnabled="{Binding CanPrimary}"
-                                                IsVisible="{Binding ShowInstallButton}" Margin="0,8,0,0" />
-                                        <Button Classes="unlock" Content="Unlock"
-                                                Command="{Binding OpenOfferCommand}" IsVisible="{Binding IsLocked}"
-                                                ToolTip.Tip="{Binding OfferHeadline}" Margin="0,8,0,0" />
-                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,2,0,0">
-                                            <Button Content="{Binding SecondaryActionText}" IsVisible="{Binding ShowSecondary}"
-                                                    Command="{Binding SecondaryActionCommand}" Background="Transparent"
-                                                    BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
-                                                    FontSize="10" Padding="4,2" />
-                                            <Button Content="⚙ Delivery" IsVisible="{Binding ShowConfig}"
-                                                    Command="{Binding OpenConfigCommand}" Background="Transparent"
-                                                    BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
-                                                    FontSize="10" Padding="4,2" ToolTip.Tip="How new deals notify you" />
-                                        </StackPanel>
                                     </StackPanel>
-                                </Border>
+
+                                    <!-- Settings gear, top-left (badges live top-right, so no clash). -->
+                                    <Button IsVisible="{Binding ShowSettingsGear}" Command="{Binding OpenSettingsCommand}"
+                                            Content="⚙" FontSize="16" Foreground="{StaticResource SilkMutedBrush}"
+                                            Background="Transparent" BorderThickness="0" Padding="2" Margin="20,6,0,0"
+                                            HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="Hand"
+                                            ToolTip.Tip="Settings">
+                                        <Button.Styles>
+                                            <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Style>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Style>
+                                        </Button.Styles>
+                                    </Button>
+                                    </Panel>
+                                                </Border>
+                                            </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </DataTemplate>
+                            </Carousel.ItemTemplate>
+                        </Carousel>
+
+                        <Button Grid.Column="2" Classes="icon" Content="›" FontSize="24"
+                                Command="{Binding NextPageCommand}" IsEnabled="{Binding CanNextPage}"
+                                IsVisible="{Binding HasMultiplePages}" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <!-- Page dots (phone-style): click to jump; wheel / arrows also turn pages. -->
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding PageDots}" IsVisible="{Binding HasMultiplePages}"
+                                  HorizontalAlignment="Center" Margin="0,10,0,4">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PageDotViewModel">
+                                <Button Command="{Binding GoCommand}" Width="14" Height="14" Padding="0"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        ToolTip.Tip="Go to page">
+                                    <Button.Styles>
+                                        <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+                                            <Setter Property="Background" Value="Transparent" />
+                                        </Style>
+                                        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                            <Setter Property="Background" Value="Transparent" />
+                                        </Style>
+                                    </Button.Styles>
+                                    <Panel>
+                                        <Ellipse Width="8" Height="8" Fill="{StaticResource SilkMutedBrush}" Opacity="0.45" />
+                                        <Ellipse Width="9" Height="9" Fill="{StaticResource LedGreenBrush}"
+                                                 IsVisible="{Binding IsActive}" />
+                                    </Panel>
+                                </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-                </ScrollViewer>
+                    </ItemsControl>
+                </Grid>
 
             </Panel>
         </Grid>
@@ -397,11 +487,26 @@
         <Grid IsVisible="{Binding ShowInbox}" RowDefinitions="Auto,*" Margin="24,20">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
                 <Button Classes="icon" Command="{Binding CloseInboxCommand}" Content="←" ToolTip.Tip="Back" />
+
+                <!-- The web app's own icon (publisher mark → glyph fallback), same as its shelf tile. -->
+                <Border Width="30" Height="30" CornerRadius="7" VerticalAlignment="Center"
+                        Background="{StaticResource DieGlowBrush}" BorderBrush="{StaticResource CopperDimBrush}"
+                        BorderThickness="1" ClipToBounds="True">
+                    <Panel>
+                        <Image Source="{Binding InboxIcon}" IsVisible="{Binding InboxHasIcon}"
+                               Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        <Path IsVisible="{Binding !InboxHasIcon}"
+                              Data="{Binding InboxGlyphKey, Converter={StaticResource AppGlyph}}"
+                              Fill="{StaticResource SilkBrush}" Stretch="Uniform" Width="18" Height="18"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Panel>
+                </Border>
+
                 <TextBlock Text="{Binding InboxTitle}" FontSize="20" FontWeight="SemiBold"
                            Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
             </StackPanel>
 
-            <ScrollViewer Grid.Row="1">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding InboxItems}" MaxWidth="580" HorizontalAlignment="Left">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
@@ -410,61 +515,21 @@
                         <DataTemplate x:DataType="vm:InboxItemViewModel">
                             <Button Command="{Binding OpenCommand}" HorizontalAlignment="Stretch"
                                     Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
-                                    BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8"
+                                    BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8"
                                     ToolTip.Tip="{Binding Url}">
-                                <StackPanel HorizontalAlignment="Left" Spacing="2">
-                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding PublishedAt}" FontSize="11"
-                                               Foreground="{StaticResource SilkMutedBrush}" />
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Grid>
-
-        <!-- ================= WEB DELIVERY CONFIG ================= -->
-        <Grid IsVisible="{Binding ShowWebConfig}" RowDefinitions="Auto,*,Auto" Margin="24,20">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
-                <Button Classes="icon" Command="{Binding CloseWebConfigCommand}" Content="←" ToolTip.Tip="Back" />
-                <TextBlock Text="{Binding WebConfigTitle}" FontSize="20" FontWeight="SemiBold"
-                           Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
-            </StackPanel>
-            <TextBlock Grid.Row="0" Text="How should new deals reach you?" FontSize="12"
-                       Foreground="{StaticResource SilkMutedBrush}" VerticalAlignment="Bottom" Margin="46,0,0,0" />
-
-            <ScrollViewer Grid.Row="1" Margin="0,14,0,0">
-                <ItemsControl ItemsSource="{Binding WebConfigOptions}" MaxWidth="520" HorizontalAlignment="Left">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:WebDeliveryOptionViewModel">
-                            <Button Command="{Binding SelectCommand}" HorizontalAlignment="Stretch"
-                                    Background="{StaticResource BoardPanelBrush}" BorderThickness="1.5"
-                                    CornerRadius="8" Padding="14,11" Margin="0,0,0,8">
-                                <Button.Styles>
-                                    <Style Selector="Button">
-                                        <Setter Property="BorderBrush" Value="{StaticResource BoardBorderBrush}" />
-                                    </Style>
-                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{StaticResource BoardPanelBrush}" />
-                                    </Style>
-                                </Button.Styles>
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <!-- Radio dot -->
-                                    <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8" Margin="0,2,12,0"
-                                            VerticalAlignment="Top" BorderThickness="1.5"
-                                            BorderBrush="{StaticResource CopperDimBrush}">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource LedGreenBrush}"
-                                                 IsVisible="{Binding IsSelected}" />
+                                    <!-- Link-preview thumbnail (same as the toast), left of the title. -->
+                                    <Border Grid.Column="0" IsVisible="{Binding HasImage}" Width="52" Height="52"
+                                            CornerRadius="6" ClipToBounds="True" Margin="0,0,12,0"
+                                            VerticalAlignment="Center">
+                                        <Image Source="{Binding Image}" Stretch="UniformToFill"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
                                     </Border>
-                                    <StackPanel Grid.Column="1" Spacing="3">
-                                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource SilkBrush}"
-                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Description}" FontSize="12"
-                                                   Foreground="{StaticResource SilkMutedBrush}" TextWrapping="Wrap" />
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Left" Spacing="2"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding PublishedAt}" FontSize="11"
+                                                   Foreground="{StaticResource SilkMutedBrush}" />
                                     </StackPanel>
                                 </Grid>
                             </Button>
@@ -472,35 +537,129 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+        </Grid>
 
-            <StackPanel Grid.Row="2" Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Center">
-                <Border IsVisible="{Binding ShowCadence}" Width="340" Background="{StaticResource BoardPanelBrush}"
-                        BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1" CornerRadius="8"
-                        Padding="16,12">
-                    <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
-                            <TextBlock Text="Time between pop-ups"
-                                       Foreground="{StaticResource SilkBrush}" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding WebConfigIntervalLabel}"
-                                       Foreground="{StaticResource LedGreenBrush}" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Slider Minimum="{Binding CadenceMin}" Maximum="{Binding CadenceMax}"
-                                Value="{Binding WebConfigIntervalSeconds, Mode=TwoWay}"
-                                TickFrequency="30" IsSnapToTickEnabled="True" />
-                        <Grid ColumnDefinitions="*,*">
-                            <TextBlock Grid.Column="0" Text="30 s" FontSize="11"
-                                       Foreground="{StaticResource SilkMutedBrush}" />
-                            <TextBlock Grid.Column="1" Text="1 h" FontSize="11" HorizontalAlignment="Right"
-                                       Foreground="{StaticResource SilkMutedBrush}" />
-                        </Grid>
-                    </StackPanel>
+        <!-- ================= TILE SETTINGS (web: subscription + delivery; app: status + uninstall) ========= -->
+        <Grid IsVisible="{Binding ShowTileSettings}" RowDefinitions="Auto,*" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,14">
+                <Button Classes="icon" Command="{Binding CloseTileSettingsCommand}" Content="←" ToolTip.Tip="Back" />
+
+                <Border Width="30" Height="30" CornerRadius="7" VerticalAlignment="Center"
+                        Background="{StaticResource DieGlowBrush}" BorderBrush="{StaticResource CopperDimBrush}"
+                        BorderThickness="1" ClipToBounds="True">
+                    <Panel>
+                        <Image Source="{Binding SettingsIcon}" IsVisible="{Binding SettingsHasIcon}"
+                               Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        <Path IsVisible="{Binding !SettingsHasIcon}"
+                              Data="{Binding SettingsGlyphKey, Converter={StaticResource AppGlyph}}"
+                              Fill="{StaticResource SilkBrush}" Stretch="Uniform" Width="18" Height="18"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Panel>
                 </Border>
 
-                <Button Classes="pill" Content="Save" Command="{Binding SaveWebConfigCommand}"
-                        HorizontalAlignment="Center" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SettingsTitle}" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource SilkBrush}" />
+                    <TextBlock Text="Settings" FontSize="11" Foreground="{StaticResource SilkMutedBrush}" />
+                </StackPanel>
             </StackPanel>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="520" HorizontalAlignment="Left" Spacing="14">
+
+                    <!-- Status + subscription / uninstall -->
+                    <Border Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="14,12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Status" FontSize="12" Foreground="{StaticResource SilkMutedBrush}" />
+                                <TextBlock Text="{Binding SettingsStatus}" Foreground="{StaticResource SilkBrush}"
+                                           FontWeight="SemiBold" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <Button Classes="pill" Content="Subscribe" IsVisible="{Binding ShowSubscribeButton}"
+                                        Command="{Binding SubscribeFromSettingsCommand}" />
+                                <Button Content="Unsubscribe" IsVisible="{Binding ShowUnsubscribeButton}"
+                                        Command="{Binding UnsubscribeFromSettingsCommand}" Background="Transparent"
+                                        BorderThickness="1" BorderBrush="{StaticResource BoardBorderBrush}"
+                                        Foreground="{StaticResource SilkMutedBrush}" Padding="12,6" CornerRadius="6" />
+                                <Button Content="Uninstall" IsVisible="{Binding SettingsCanUninstall}"
+                                        Command="{Binding UninstallFromSettingsCommand}" Background="Transparent"
+                                        BorderThickness="1" BorderBrush="{StaticResource BoardBorderBrush}"
+                                        Foreground="{StaticResource SilkMutedBrush}" Padding="12,6" CornerRadius="6" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Delivery (web, subscribed only) -->
+                    <StackPanel Spacing="10" IsVisible="{Binding ShowDeliverySection}">
+                        <TextBlock Text="How should new deals reach you?" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource SilkBrush}" />
+
+                        <ItemsControl ItemsSource="{Binding WebConfigOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:WebDeliveryOptionViewModel">
+                                    <Button Command="{Binding SelectCommand}" HorizontalAlignment="Stretch"
+                                            Background="{StaticResource BoardPanelBrush}" BorderThickness="1.5"
+                                            CornerRadius="8" Padding="14,11" Margin="0,0,0,8">
+                                        <Button.Styles>
+                                            <Style Selector="Button">
+                                                <Setter Property="BorderBrush" Value="{StaticResource BoardBorderBrush}" />
+                                            </Style>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{StaticResource BoardPanelBrush}" />
+                                            </Style>
+                                        </Button.Styles>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8" Margin="0,2,12,0"
+                                                    VerticalAlignment="Top" BorderThickness="1.5"
+                                                    BorderBrush="{StaticResource CopperDimBrush}">
+                                                <Ellipse Width="8" Height="8" Fill="{StaticResource LedGreenBrush}"
+                                                         IsVisible="{Binding IsSelected}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="3">
+                                                <TextBlock Text="{Binding Label}" Foreground="{StaticResource SilkBrush}"
+                                                           FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Description}" FontSize="12"
+                                                           Foreground="{StaticResource SilkMutedBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Border IsVisible="{Binding ShowCadence}" Width="340" HorizontalAlignment="Left"
+                                Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="16,12">
+                            <StackPanel Spacing="6">
+                                <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                                    <TextBlock Text="Time between pop-ups" Foreground="{StaticResource SilkBrush}"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding WebConfigIntervalLabel}" Foreground="{StaticResource LedGreenBrush}"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Slider Minimum="{Binding CadenceMin}" Maximum="{Binding CadenceMax}"
+                                        Value="{Binding WebConfigIntervalSeconds, Mode=TwoWay}"
+                                        TickFrequency="30" IsSnapToTickEnabled="True" />
+                                <Grid ColumnDefinitions="*,*">
+                                    <TextBlock Grid.Column="0" Text="30 s" FontSize="11"
+                                               Foreground="{StaticResource SilkMutedBrush}" />
+                                    <TextBlock Grid.Column="1" Text="1 h" FontSize="11" HorizontalAlignment="Right"
+                                               Foreground="{StaticResource SilkMutedBrush}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Classes="pill" Content="Save delivery" Command="{Binding SaveDeliveryConfigCommand}"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
         <!-- ================= SETTINGS ================= -->

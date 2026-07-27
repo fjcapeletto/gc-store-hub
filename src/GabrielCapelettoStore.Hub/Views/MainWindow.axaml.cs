@@ -83,6 +83,24 @@ public partial class MainWindow : Window
         }
     }
 
+    // Wheel / horizontal scroll over the shelf turns the page (phone-style paging).
+    private void ShelfPager_PointerWheelChanged(object? sender, Avalonia.Input.PointerWheelEventArgs e)
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var delta = e.Delta.Y + e.Delta.X;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        vm.TurnPage(forward: delta < 0); // wheel down / right → next page
+        e.Handled = true;
+    }
+
     private void OnCopyDiagnostics(object? sender, RoutedEventArgs e)
     {
         var text = ViewModel?.DeviceIdentity.DiagnosticsText;

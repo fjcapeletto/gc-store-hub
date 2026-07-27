@@ -24,6 +24,12 @@ public interface IAppIconCache
     Bitmap? Get(string iconUrl);
 
     /// <summary>
+    /// The bitmap for this URL, fetching (disk then network) if not yet in memory. Returns null on any
+    /// failure. Does NOT raise <see cref="Changed"/> — for on-demand needs like a toast thumbnail.
+    /// </summary>
+    Task<Bitmap?> GetOrFetchAsync(string url, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Ensures each URL is loaded (disk, then network), populating the in-memory map. Raises
     /// <see cref="Changed"/> once if any new icon became available so the shelf can re-render.
     /// </summary>
@@ -55,6 +61,29 @@ public sealed class FileAppIconCache : IAppIconCache
 
     public Bitmap? Get(string iconUrl)
         => !string.IsNullOrWhiteSpace(iconUrl) && _memory.TryGetValue(iconUrl, out var bmp) ? bmp : null;
+
+    public async Task<Bitmap?> GetOrFetchAsync(string url, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        if (_memory.TryGetValue(url, out var hit))
+        {
+            return hit;
+        }
+
+        try
+        {
+            var bmp = await LoadOneAsync(url, cancellationToken).ConfigureAwait(false);
+            return bmp is null ? null : _memory.GetOrAdd(url, bmp);
+        }
+        catch
+        {
+            return null; // best effort — a missing preview just means a toast without a thumbnail.
+        }
+    }
 
     public async Task WarmAsync(IEnumerable<string> iconUrls, CancellationToken cancellationToken = default)
     {
@@ -224,6 +253,9 @@ public sealed class NullAppIconCache : IAppIconCache
     public event Action? Changed { add { } remove { } }
 
     public Bitmap? Get(string iconUrl) => null;
+
+    public Task<Bitmap?> GetOrFetchAsync(string url, CancellationToken cancellationToken = default)
+        => Task.FromResult<Bitmap?>(null);
 
     public Task WarmAsync(IEnumerable<string> iconUrls, CancellationToken cancellationToken = default)
         => Task.CompletedTask;

@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
 namespace GabrielCapelettoStore.Hub.Notifications;
@@ -15,8 +16,8 @@ public sealed record ToastLink(string Title, Action OnClick);
 /// <summary>Raises a small pop-up near the tray (a hub-drawn toast). Click → the callback.</summary>
 public interface IToastService
 {
-    /// <summary>A single toast: title + body; clicking anywhere runs <paramref name="onClick"/>.</summary>
-    void Show(string title, string body, Action onClick);
+    /// <summary>A single toast: an optional thumbnail + title + body; clicking anywhere runs onClick.</summary>
+    void Show(string title, string body, Action onClick, Bitmap? image = null);
 
     /// <summary>A grouped toast: a header over a list of individually clickable titles (no image).</summary>
     void ShowList(string header, IReadOnlyList<ToastLink> links);
@@ -41,7 +42,8 @@ public sealed class ToastService : IToastService
     private static readonly IBrush TitleFg = new SolidColorBrush(Color.FromRgb(0xEA, 0xF1, 0xEC));
     private static readonly IBrush BodyFg = new SolidColorBrush(Color.FromRgb(0x9D, 0xB3, 0xA6));
 
-    public void Show(string title, string body, Action onClick) => Post(() => ShowCore(title, body, onClick));
+    public void Show(string title, string body, Action onClick, Bitmap? image = null)
+        => Post(() => ShowCore(title, body, onClick, image));
 
     public void ShowList(string header, IReadOnlyList<ToastLink> links) => Post(() => ShowListCore(header, links));
 
@@ -50,19 +52,41 @@ public sealed class ToastService : IToastService
         try { action(); } catch { /* a toast must never crash the hub */ }
     });
 
-    private static void ShowCore(string title, string body, Action onClick)
+    private static void ShowCore(string title, string body, Action onClick, Bitmap? image)
     {
-        var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        content.Children.Add(new TextBlock
+        var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        textStack.Children.Add(new TextBlock
         {
             Text = title, FontWeight = FontWeight.SemiBold, FontSize = 13, Foreground = TitleFg,
             TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1,
         });
-        content.Children.Add(new TextBlock
+        textStack.Children.Add(new TextBlock
         {
             Text = body, FontSize = 12, Foreground = BodyFg, TextWrapping = TextWrapping.Wrap,
             MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0),
         });
+
+        Control content;
+        if (image is not null)
+        {
+            // Thumbnail (the link's og:image, re-hosted by our server) on the left, text on the right.
+            var thumb = new Border
+            {
+                Width = 56, Height = 56, CornerRadius = new CornerRadius(8), ClipToBounds = true,
+                Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center,
+                Child = new Image { Source = image, Stretch = Stretch.UniformToFill },
+            };
+            Grid.SetColumn(thumb, 0);
+            Grid.SetColumn(textStack, 1);
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+            grid.Children.Add(thumb);
+            grid.Children.Add(textStack);
+            content = grid;
+        }
+        else
+        {
+            content = textStack;
+        }
 
         var window = CreateShell(Height, content);
         var timer = StartAutoClose(window, Linger);
@@ -131,6 +155,8 @@ public sealed class ToastService : IToastService
         var window = new Window
         {
             // Avalonia 12 dropped SystemDecorations — extend the client area over the chrome instead.
+            // Blank the Title so the default "Window" caption doesn't bleed through over the content.
+            Title = "",
             ExtendClientAreaToDecorationsHint = true,
             ExtendClientAreaTitleBarHeightHint = -1,
             Topmost = true,
@@ -185,6 +211,6 @@ public sealed class ToastService : IToastService
 
 public sealed class NullToastService : IToastService
 {
-    public void Show(string title, string body, Action onClick) { }
+    public void Show(string title, string body, Action onClick, Bitmap? image = null) { }
     public void ShowList(string header, IReadOnlyList<ToastLink> links) { }
 }

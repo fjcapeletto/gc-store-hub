@@ -31,7 +31,7 @@ server returns the current **link-list** (not a package):
   "appId": "com.gc.deals",
   "type": "web",
   "items": [
-    { "id": "d-1042", "title": "Refurb ThinkPad — 30% off (eBay)", "url": "https://www.ebay.com/itm/…", "publishedAt": "2026-07-26T14:00:00Z" },
+    { "id": "d-1042", "title": "Refurb ThinkPad — 30% off (eBay)", "url": "https://www.ebay.com/itm/…", "publishedAt": "2026-07-26T14:00:00Z", "imageUrl": "https://gcstore.gabrielcapeletto.com/icons/preview/com.gc.deals/<sha256>.jpg" },
     { "id": "d-1041", "title": "Back-to-school bundle (Walmart)",   "url": "https://www.walmart.com/ip/…", "publishedAt": "2026-07-25T18:00:00Z" }
   ]
 }
@@ -40,6 +40,13 @@ server returns the current **link-list** (not a package):
 - The hub **polls this on a cadence** (see below) — this *is* the "push" (pull + local toast; no WNS).
 - `item.url` is any external URL (marketplace or GC's own site). `id` is stable per link (the hub uses
   it to detect what's new and to de-dupe the inbox).
+- `item.imageUrl` is an **optional** link-preview thumbnail for the toast. The **server** resolves the
+  target's `og:image` (or the operator supplies one) at publish time, validates it, and **re-hosts it
+  content-hashed on our own domain** — so `imageUrl` always points at gcstore, never the external CDN,
+  and the client's IP never leaks to eBay/Amazon/etc. Same trust model as the app icon. Absent when no
+  preview was available (no image, timeout) → text-only toast, unchanged. Cache rule = URL is the
+  version (content-hashed ⇒ new image = new URL = refresh). Only the individual toast renders it; the
+  grouped toast stays image-less.
 - **Ungranted / revoked** device → `403 { reason, offer }` (as everywhere). That is the revoke path.
 - The server may return only the recent N items; the hub keeps its own inbox history.
 

@@ -13,21 +13,20 @@ public sealed record WebTile(
     string? OfferHeadline,
     string? OfferUrl,
     Action Subscribe,
-    Action Unsubscribe,
-    Action OpenInbox,
-    Action OpenConfig);
+    Action OpenInbox);
 
 /// <summary>
-/// A single shelf item. Two shapes: a packaged <c>app</c> (Install/Open/Update/Uninstall, gated by
-/// the lease) or a <c>web</c> item (Subscribe/Open-inbox/Unsubscribe, NOT gated by store access —
-/// its gate is the delivery poll: 403 = revoked). Immutable per render.
+/// A single shelf item. Two shapes: a packaged <c>app</c> (Install/Open/Update, gated by the lease) or
+/// a <c>web</c> item (Subscribe/Open-inbox, NOT gated by store access — its gate is the delivery poll:
+/// 403 = revoked). The tile face is just the clickable icon + title; everything else (unsubscribe,
+/// uninstall, delivery, status) lives behind a per-tile Settings gear. Immutable per render.
 /// </summary>
 public sealed partial class ShelfItemViewModel : ObservableObject
 {
     private readonly Action<ShelfItemViewModel>? _installAction;
     private readonly Action<ShelfItemViewModel>? _openAction;
     private readonly Action<ShelfItemViewModel>? _updateAction;
-    private readonly Action<ShelfItemViewModel>? _uninstallAction;
+    private readonly Action<ShelfItemViewModel>? _openSettingsAction;
     private readonly Action<string>? _openOfferAction;
     private readonly WebTile? _web;
     private readonly bool _isOnline;
@@ -44,7 +43,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         CatalogInstall? installOverride = null,
         Action<ShelfItemViewModel>? openAction = null,
         Action<ShelfItemViewModel>? updateAction = null,
-        Action<ShelfItemViewModel>? uninstallAction = null,
+        Action<ShelfItemViewModel>? openSettingsAction = null,
         WebTile? web = null,
         Bitmap? icon = null)
     {
@@ -57,7 +56,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         _installAction = installAction;
         _openAction = openAction;
         _updateAction = updateAction;
-        _uninstallAction = uninstallAction;
+        _openSettingsAction = openSettingsAction;
         _openOfferAction = openOfferAction;
         _web = web;
 
@@ -93,7 +92,6 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public Bitmap? Icon { get; }
     public bool HasIcon => Icon is not null;
 
-    public string? Summary => App.Summary;
     public AppIdentityMode IdentityMode => App.IdentityMode;
 
     public string AvailableVersion => App.Version;
@@ -105,14 +103,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool IsNew => Status == NoveltyStatus.New;
     public bool IsUpdated => Status == NoveltyStatus.Updated;
 
-    /// <summary>Version/status line under the name.</summary>
-    public string VersionSubline =>
-        IsWeb ? (_web!.Subscribed ? "subscribed" : "offers & deals")
-        : !IsInstalled ? $"v{AvailableVersion} · available"
-        : UpdateAvailable ? $"v{InstalledVersion} → v{AvailableVersion}"
-        : $"v{AvailableVersion} · installed";
-
-    /// <summary>Primary action: web → Subscribe/Open(inbox); app → Install/Update/Open.</summary>
+    /// <summary>Primary verb: web → Subscribe/Open(inbox); app → Install/Update/Open.</summary>
     public string PrimaryActionText =>
         IsWeb ? (_web!.Subscribed ? "Open" : "Subscribe")
         : !IsInstalled ? "Install"
@@ -122,16 +113,18 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool IsLocked { get; }
     public CatalogOffer? Offer { get; }
 
-    public bool ShowInstallButton => !IsLocked;
+    /// <summary>The verb shown when the mouse is over the icon (the icon is the primary affordance).</summary>
+    public string IconHoverText => IsLocked ? "Unlock" : PrimaryActionText;
+
+    /// <summary>The icon is clickable whenever there's an action: unlock (locked) or the primary action.</summary>
+    public bool IconEnabled => IsLocked || CanPrimary;
+
     public string OfferHeadline => Offer?.Headline ?? "Buy store access";
     public double IdentityOpacity => IsLocked ? 0.4 : 1.0;
 
-    /// <summary>Secondary action: web → Unsubscribe (when subscribed); app → Uninstall (when installed).</summary>
-    public bool ShowSecondary => !IsLocked && (IsWeb ? _web!.Subscribed : IsInstalled);
-    public string SecondaryActionText => IsWeb ? "Unsubscribe" : "Uninstall";
-
-    /// <summary>Delivery-config gear — only for a subscribed web app (chooses how new deals notify).</summary>
-    public bool ShowConfig => IsWeb && !IsLocked && _web!.Subscribed;
+    /// <summary>The per-tile Settings gear is always available — it holds status plus whatever actions
+    /// the state offers (web: subscribe/unsubscribe/delivery; app: uninstall once installed).</summary>
+    public bool ShowSettingsGear => true;
 
     private bool NeedsOnline => !IsWeb && (!IsInstalled || UpdateAvailable);
     public bool CanPrimary => !IsLocked && (!NeedsOnline || _isOnline);
@@ -167,21 +160,22 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         }
     }
 
+    /// <summary>Clicking the icon = unlock when locked, otherwise the state's primary action.</summary>
     [RelayCommand]
-    private void SecondaryAction()
+    private void IconAction()
     {
-        if (IsWeb)
+        if (IsLocked)
         {
-            _web!.Unsubscribe();
+            OpenOffer();
         }
         else
         {
-            _uninstallAction?.Invoke(this);
+            PrimaryAction();
         }
     }
 
     [RelayCommand]
-    private void OpenConfig() => _web?.OpenConfig();
+    private void OpenSettings() => _openSettingsAction?.Invoke(this);
 
     [RelayCommand]
     private void OpenOffer()

@@ -53,6 +53,9 @@ public sealed class WebInboxItem
     public string Title { get; set; } = "";
     public string Url { get; set; } = "";
     public string? PublishedAt { get; set; }
+
+    /// <summary>The link-preview thumbnail URL (same as the toast's), shown left of the inbox row.</summary>
+    public string? ImageUrl { get; set; }
 }
 
 public sealed class WebState

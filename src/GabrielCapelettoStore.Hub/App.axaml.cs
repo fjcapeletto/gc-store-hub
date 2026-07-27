@@ -60,7 +60,14 @@ public partial class App : Application
             };
 
             var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            ICatalogSource catalogSource = new HttpCatalogSource(httpClient, catalogOptions);
+
+            // Dev-only: GCSTORE_MockCatalog=1 swaps in a many-app catalog (and skips entitlement) to
+            // exercise the paged shelf. Never set in production.
+            var useMockCatalog = configuration["MockCatalog"] is "1" or "true";
+
+            ICatalogSource catalogSource = useMockCatalog
+                ? new MockCatalogSource()
+                : new HttpCatalogSource(httpClient, catalogOptions);
             ICatalogStateStore observationStore = new FileCatalogStateStore();
             IInstallStateStore installStore = new FileInstallStateStore();
             ICatalogCache catalogCache = new FileCatalogCache();
@@ -78,12 +85,14 @@ public partial class App : Application
             // Device identity: the hub-generated id + the license it presents (dev/config license
             // seeds the store fallback so the current test flow keeps working).
             var deviceIdentity = new DeviceIdentity(new FileDeviceStore(), fingerprintCollector, entitlementOptions.License);
-            IEntitlementService entitlement = new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);
+            IEntitlementService entitlement = useMockCatalog
+                ? new NullEntitlementService()
+                : new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);
             IDeliveryService delivery = new HttpDeliveryService(httpClient, entitlementOptions, deviceIdentity);
             IAppInstaller installer = new AppInstaller(httpClient);
             IWebService webService = new HttpWebService(httpClient, entitlementOptions, deviceIdentity);
-            var webManager = new WebManager(webService, new FileWebStore(), new ToastService());
             IAppIconCache iconCache = new FileAppIconCache(httpClient);
+            var webManager = new WebManager(webService, new FileWebStore(), new ToastService(), iconCache);
 
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
