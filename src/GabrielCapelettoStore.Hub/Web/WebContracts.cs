@@ -10,6 +10,13 @@ public sealed record WebItem
     public required string Title { get; init; }
     public required string Url { get; init; }
     public string? PublishedAt { get; init; }
+
+    /// <summary>
+    /// OPTIONAL scheduled-release time (ISO-8601). Absent = deliver now. While this is in the future
+    /// the hub hides the item entirely (no toast, not in the inbox) until it's due — a way for the
+    /// server to queue posts ahead of time. Pending server ratification (see contract/type-web.md).
+    /// </summary>
+    public string? DeliverAt { get; init; }
 }
 
 /// <summary>Body of POST /v1/delivery/{appId} for a web app: the current link-list.</summary>

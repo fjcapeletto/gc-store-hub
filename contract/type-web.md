@@ -43,6 +43,21 @@ server returns the current **link-list** (not a package):
 - **Ungranted / revoked** device → `403 { reason, offer }` (as everywhere). That is the revoke path.
 - The server may return only the recent N items; the hub keeps its own inbox history.
 
+#### Scheduled delivery — optional `deliverAt`
+
+An item may carry an optional `deliverAt` (ISO-8601), letting the server queue a post ahead of time:
+
+```json
+{ "id": "d-1050", "title": "Cyber Monday drop", "url": "https://…", "publishedAt": "2026-11-25T09:00:00Z", "deliverAt": "2026-11-30T13:00:00Z" }
+```
+
+- **Absent → deliver now** (present behaviour, unchanged).
+- **In the future →** the hub treats the item as if it doesn't exist yet: **no toast, not in the
+  inbox**. Once `deliverAt` has passed, a later poll surfaces it normally (toast per the mode + inbox).
+- Unparseable `deliverAt` **fails open** (shown now) — the hub never hides content by accident.
+- The hub honours this today (the field is optional; absent = present). Ratified bilaterally — the
+  server emits `deliverAt` on scheduled posts.
+
 ### Subscription
 Client-side in v0: subscribing = the hub starts polling + notifying; unsubscribing = it stops and
 clears local state. The server gates by **entitlement** (revoke), independent of the client's
@@ -52,11 +67,30 @@ not required for the mechanics.)*
 ## Hub behaviour
 
 - **Tile:** Subscribe / Unsubscribe. When subscribed, poll `/v1/delivery/{appId}` on the cadence.
-- **New-item detection:** items whose `id` wasn't seen before → raise a **Windows systray toast**
-  (title = `item.title`; activating it opens `item.url`). Requires an **AUMID** — available via the
-  Start-Menu shortcut Velopack creates.
+- **New-item detection:** items whose `id` wasn't seen before are "new". How they're surfaced is a
+  **per-app, client-side delivery mode** (below). The seen-set is pruned to the ids still on the
+  server's list, so it can't grow without bound.
 - **Inbox:** keep the last N items locally (id/title/url/publishedAt). Clicking the app tile opens the
   inbox list; clicking an item opens `item.url`.
+
+### Delivery modes (client-side, per app)
+
+The customer chooses how a web app notifies, via a gear on the tile. The hub owns this — it is **not**
+in the contract; the server just supplies the items.
+
+- **One at a time · oldest → newest** *(default)* — each new item is its own toast, emitted from the
+  oldest-unseen to the newest, one every **cadence** (configurable per app; see below). Nothing is
+  coalesced, so when a toast later carries its own image no content is lost. If the device was off and
+  comes back to several unseen, they drip out on the cadence (the first fires immediately).
+- **One at a time · newest → oldest** — same, but most-recent first.
+- **One grouped toast** — a single image-less toast listing every new title as a clickable line.
+- **Don't notify** — no toasts; new items just accumulate in the inbox until the user opens the app.
+
+An item is marked "seen" only when it is actually surfaced (or, for silent, on receipt), so a mode
+that drips over time still resumes correctly after a restart.
+
+**Cadence** — for the two one-at-a-time modes, the gap between toasts is configurable per app,
+**30 s min, 1 h max, default 2 min**. Client-side only (persisted locally); not part of the wire.
 - **Open a link:** `Process.Start(url)` with `UseShellExecute` → the user's default browser. No webview.
 - **Revoke / unsubscribe:** on `403`, show revoked + stop; on unsubscribe, stop polling + clear.
 - **Cadence & politeness:** poll on a sensible interval (e.g. the tray heartbeat cadence — slower in the

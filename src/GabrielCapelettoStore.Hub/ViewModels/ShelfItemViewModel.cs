@@ -14,7 +14,8 @@ public sealed record WebTile(
     string? OfferUrl,
     Action Subscribe,
     Action Unsubscribe,
-    Action OpenInbox);
+    Action OpenInbox,
+    Action OpenConfig);
 
 /// <summary>
 /// A single shelf item. Two shapes: a packaged <c>app</c> (Install/Open/Update/Uninstall, gated by
@@ -129,6 +130,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool ShowSecondary => !IsLocked && (IsWeb ? _web!.Subscribed : IsInstalled);
     public string SecondaryActionText => IsWeb ? "Unsubscribe" : "Uninstall";
 
+    /// <summary>Delivery-config gear — only for a subscribed web app (chooses how new deals notify).</summary>
+    public bool ShowConfig => IsWeb && !IsLocked && _web!.Subscribed;
+
     private bool NeedsOnline => !IsWeb && (!IsInstalled || UpdateAvailable);
     public bool CanPrimary => !IsLocked && (!NeedsOnline || _isOnline);
 
@@ -175,6 +179,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
             _uninstallAction?.Invoke(this);
         }
     }
+
+    [RelayCommand]
+    private void OpenConfig() => _web?.OpenConfig();
 
     [RelayCommand]
     private void OpenOffer()

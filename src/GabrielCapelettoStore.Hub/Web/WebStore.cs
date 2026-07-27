@@ -5,11 +5,35 @@ using System.Text.Json;
 
 namespace GabrielCapelettoStore.Hub.Web;
 
-/// <summary>Per web-app local state: subscription, which items were already seen, and the inbox.</summary>
+/// <summary>
+/// How a web app surfaces new items to the user. Client-side, per app, chosen in the app's delivery
+/// config (see contract/type-web.md). Default (value 0) = one toast per item, oldest→newest, spaced.
+/// </summary>
+public enum WebDeliveryMode
+{
+    /// <summary>Default: one toast per unseen item, oldest→newest, one every <c>EmitInterval</c>.</summary>
+    IndividualOldestFirst = 0,
+
+    /// <summary>One toast per unseen item, newest→oldest, one every <c>EmitInterval</c>.</summary>
+    IndividualNewestFirst = 1,
+
+    /// <summary>A single (image-less) toast listing all new titles as a clickable group.</summary>
+    GroupedTitles = 2,
+
+    /// <summary>No toasts at all — the user only sees deals by opening the app's inbox.</summary>
+    Silent = 3,
+}
+
+/// <summary>Per web-app local state: subscription, delivery mode, seen ids, and the inbox.</summary>
 public sealed class WebAppState
 {
     public bool Subscribed { get; set; }
-    public bool Muted { get; set; }
+
+    /// <summary>How new items are surfaced (toast policy). Absent in old state = 0 = the default.</summary>
+    public WebDeliveryMode DeliveryMode { get; set; } = WebDeliveryMode.IndividualOldestFirst;
+
+    /// <summary>Seconds between individual toasts (clamped 30–3600 by the manager). Default 2 min.</summary>
+    public int EmitIntervalSeconds { get; set; } = 120;
 
     /// <summary>Set when the last poll returned 403 — this device was revoked from the stream.</summary>
     public bool Revoked { get; set; }

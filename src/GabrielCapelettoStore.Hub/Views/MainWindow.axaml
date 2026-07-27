@@ -303,10 +303,16 @@
                                         <Button Classes="unlock" Content="Unlock"
                                                 Command="{Binding OpenOfferCommand}" IsVisible="{Binding IsLocked}"
                                                 ToolTip.Tip="{Binding OfferHeadline}" Margin="0,8,0,0" />
-                                        <Button Content="{Binding SecondaryActionText}" IsVisible="{Binding ShowSecondary}"
-                                                Command="{Binding SecondaryActionCommand}" Background="Transparent"
-                                                BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
-                                                FontSize="10" Padding="4,2" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,2,0,0">
+                                            <Button Content="{Binding SecondaryActionText}" IsVisible="{Binding ShowSecondary}"
+                                                    Command="{Binding SecondaryActionCommand}" Background="Transparent"
+                                                    BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
+                                                    FontSize="10" Padding="4,2" />
+                                            <Button Content="⚙ Delivery" IsVisible="{Binding ShowConfig}"
+                                                    Command="{Binding OpenConfigCommand}" Background="Transparent"
+                                                    BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
+                                                    FontSize="10" Padding="4,2" ToolTip.Tip="How new deals notify you" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
@@ -416,6 +422,85 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+        </Grid>
+
+        <!-- ================= WEB DELIVERY CONFIG ================= -->
+        <Grid IsVisible="{Binding ShowWebConfig}" RowDefinitions="Auto,*,Auto" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
+                <Button Classes="icon" Command="{Binding CloseWebConfigCommand}" Content="←" ToolTip.Tip="Back" />
+                <TextBlock Text="{Binding WebConfigTitle}" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Row="0" Text="How should new deals reach you?" FontSize="12"
+                       Foreground="{StaticResource SilkMutedBrush}" VerticalAlignment="Bottom" Margin="46,0,0,0" />
+
+            <ScrollViewer Grid.Row="1" Margin="0,14,0,0">
+                <ItemsControl ItemsSource="{Binding WebConfigOptions}" MaxWidth="520" HorizontalAlignment="Left">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WebDeliveryOptionViewModel">
+                            <Button Command="{Binding SelectCommand}" HorizontalAlignment="Stretch"
+                                    Background="{StaticResource BoardPanelBrush}" BorderThickness="1.5"
+                                    CornerRadius="8" Padding="14,11" Margin="0,0,0,8">
+                                <Button.Styles>
+                                    <Style Selector="Button">
+                                        <Setter Property="BorderBrush" Value="{StaticResource BoardBorderBrush}" />
+                                    </Style>
+                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource BoardPanelBrush}" />
+                                    </Style>
+                                </Button.Styles>
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <!-- Radio dot -->
+                                    <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8" Margin="0,2,12,0"
+                                            VerticalAlignment="Top" BorderThickness="1.5"
+                                            BorderBrush="{StaticResource CopperDimBrush}">
+                                        <Ellipse Width="8" Height="8" Fill="{StaticResource LedGreenBrush}"
+                                                 IsVisible="{Binding IsSelected}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource SilkBrush}"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" FontSize="12"
+                                                   Foreground="{StaticResource SilkMutedBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Center">
+                <Border IsVisible="{Binding ShowCadence}" Width="340" Background="{StaticResource BoardPanelBrush}"
+                        BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1" CornerRadius="8"
+                        Padding="16,12">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                            <TextBlock Text="Time between pop-ups"
+                                       Foreground="{StaticResource SilkBrush}" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding WebConfigIntervalLabel}"
+                                       Foreground="{StaticResource LedGreenBrush}" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Slider Minimum="{Binding CadenceMin}" Maximum="{Binding CadenceMax}"
+                                Value="{Binding WebConfigIntervalSeconds, Mode=TwoWay}"
+                                TickFrequency="30" IsSnapToTickEnabled="True" />
+                        <Grid ColumnDefinitions="*,*">
+                            <TextBlock Grid.Column="0" Text="30 s" FontSize="11"
+                                       Foreground="{StaticResource SilkMutedBrush}" />
+                            <TextBlock Grid.Column="1" Text="1 h" FontSize="11" HorizontalAlignment="Right"
+                                       Foreground="{StaticResource SilkMutedBrush}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Button Classes="pill" Content="Save" Command="{Binding SaveWebConfigCommand}"
+                        HorizontalAlignment="Center" />
+            </StackPanel>
         </Grid>
 
         <!-- ================= SETTINGS ================= -->

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -138,8 +139,13 @@ public partial class MainViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowMainArea))]
     public partial bool ShowInbox { get; set; }
 
-    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox) is open.</summary>
-    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox;
+    /// <summary>Whether a web app's delivery-config modal is showing instead of the catalog.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
+    public partial bool ShowWebConfig { get; set; }
+
+    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox / Config) is open.</summary>
+    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox && !ShowWebConfig;
 
     // --- Web app inbox (type: web, e.g. GC Deals) ---
     [ObservableProperty] public partial string InboxTitle { get; set; } = "";
@@ -166,8 +172,105 @@ public partial class MainViewModel : ViewModelBase
         LoadInbox(appId);
         ShowSettings = false;
         ShowAccess = false;
+        ShowWebConfig = false;
         ShowInbox = true;
     }
+
+    // --- Web app delivery config (how new deals notify: one-by-one / grouped / silent + cadence) ---
+    [ObservableProperty] public partial string WebConfigTitle { get; set; } = "";
+    private string _configAppId = "";
+    public ObservableCollection<WebDeliveryOptionViewModel> WebConfigOptions { get; } = [];
+
+    /// <summary>Cadence (seconds) between individual toasts; bound to the slider. Clamped to the range.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WebConfigIntervalLabel))]
+    public partial double WebConfigIntervalSeconds { get; set; } = WebManager.DefaultEmitSeconds;
+
+    public double CadenceMin => WebManager.MinEmitSeconds;
+    public double CadenceMax => WebManager.MaxEmitSeconds;
+    public string WebConfigIntervalLabel => FormatInterval((int)Math.Round(WebConfigIntervalSeconds));
+
+    /// <summary>Cadence only matters for the one-at-a-time modes; hidden for grouped/silent.</summary>
+    public bool ShowCadence => WebConfigOptions.Any(o => o.IsSelected &&
+        o.Mode is WebDeliveryMode.IndividualOldestFirst or WebDeliveryMode.IndividualNewestFirst);
+
+    private void OpenWebConfig(string appId, string appName)
+    {
+        _configAppId = appId;
+        WebConfigTitle = appName;
+        WebConfigIntervalSeconds = _web.GetIntervalSeconds(appId);
+
+        var current = _web.GetMode(appId);
+        WebConfigOptions.Clear();
+        foreach (var (mode, label, description) in DeliveryOptionCatalog)
+        {
+            WebConfigOptions.Add(new WebDeliveryOptionViewModel(
+                mode, label, description, selected: mode == current, SelectWebConfigOption));
+        }
+
+        OnPropertyChanged(nameof(ShowCadence));
+        ShowSettings = false;
+        ShowAccess = false;
+        ShowInbox = false;
+        ShowWebConfig = true;
+    }
+
+    private void SelectWebConfigOption(WebDeliveryOptionViewModel chosen)
+    {
+        foreach (var option in WebConfigOptions)
+        {
+            option.IsSelected = ReferenceEquals(option, chosen);
+        }
+
+        OnPropertyChanged(nameof(ShowCadence));
+    }
+
+    [RelayCommand]
+    private void SaveWebConfig()
+    {
+        var selected = WebConfigOptions.FirstOrDefault(o => o.IsSelected);
+        if (selected is not null && !string.IsNullOrEmpty(_configAppId))
+        {
+            _web.SetMode(_configAppId, selected.Mode);
+            _web.SetIntervalSeconds(_configAppId, (int)Math.Round(WebConfigIntervalSeconds));
+        }
+
+        ShowWebConfig = false;
+    }
+
+    private static string FormatInterval(int seconds)
+    {
+        if (seconds < 60)
+        {
+            return $"{seconds} s";
+        }
+
+        if (seconds < 3600)
+        {
+            var m = seconds / 60;
+            var s = seconds % 60;
+            return s == 0 ? $"{m} min" : $"{m} min {s} s";
+        }
+
+        var h = seconds / 3600;
+        var rem = (seconds % 3600) / 60;
+        return rem == 0 ? $"{h} h" : $"{h} h {rem} min";
+    }
+
+    [RelayCommand]
+    private void CloseWebConfig() => ShowWebConfig = false;
+
+    private static readonly (WebDeliveryMode Mode, string Label, string Description)[] DeliveryOptionCatalog =
+    [
+        (WebDeliveryMode.IndividualOldestFirst, "One at a time · oldest first",
+            "Each new deal pops as its own toast, oldest → newest, spaced by the cadence below. The default."),
+        (WebDeliveryMode.IndividualNewestFirst, "One at a time · newest first",
+            "Each new deal pops as its own toast, newest → oldest, spaced by the cadence below."),
+        (WebDeliveryMode.GroupedTitles, "One grouped toast",
+            "A single pop-up listing every new deal's title — click a title to open it."),
+        (WebDeliveryMode.Silent, "Don't notify",
+            "No pop-ups. New deals wait quietly in the app — open it to see them."),
+    ];
 
     private void LoadInbox(string appId)
     {
@@ -470,7 +573,8 @@ public partial class MainViewModel : ViewModelBase
                     OfferUrl: _web.RevokedUrl(app.Id),
                     Subscribe: () => _web.Subscribe(app.Id),
                     Unsubscribe: () => _web.Unsubscribe(app.Id),
-                    OpenInbox: () => OpenWebInbox(app.Id, app.Name));
+                    OpenInbox: () => OpenWebInbox(app.Id, app.Name),
+                    OpenConfig: () => OpenWebConfig(app.Id, app.Name));
                 var webIcon = app.IconUrl is { } wu ? _icons.Get(wu) : null;
                 items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline, web: web, icon: webIcon));
                 signature.Append(app.Id).Append("|web|")
@@ -757,6 +861,9 @@ public partial class MainViewModel : ViewModelBase
     private void OpenSettings()
     {
         DeviceIdentity.Load();
+        ShowInbox = false;
+        ShowWebConfig = false;
+        ShowAccess = false;
         ShowSettings = true;
     }
 
@@ -768,6 +875,8 @@ public partial class MainViewModel : ViewModelBase
     {
         AccessMessage = "";
         ShowSettings = false;
+        ShowInbox = false;
+        ShowWebConfig = false;
         ShowAccess = true;
     }
 
