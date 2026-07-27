@@ -65,9 +65,6 @@ public partial class App : Application
             // exercise the paged shelf. Never set in production.
             var useMockCatalog = configuration["MockCatalog"] is "1" or "true";
 
-            ICatalogSource catalogSource = useMockCatalog
-                ? new MockCatalogSource()
-                : new HttpCatalogSource(httpClient, catalogOptions);
             ICatalogStateStore observationStore = new FileCatalogStateStore();
             IInstallStateStore installStore = new FileInstallStateStore();
             ICatalogCache catalogCache = new FileCatalogCache();
@@ -85,6 +82,13 @@ public partial class App : Application
             // Device identity: the hub-generated id + the license it presents (dev/config license
             // seeds the store fallback so the current test flow keeps working).
             var deviceIdentity = new DeviceIdentity(new FileDeviceStore(), fingerprintCollector, entitlementOptions.License);
+
+            // The catalog request carries the device identity so the response can vary per device
+            // (developer-marked devices also see unlocked "developer"-stage apps). See developer-stage.md.
+            ICatalogSource catalogSource = useMockCatalog
+                ? new MockCatalogSource()
+                : new HttpCatalogSource(httpClient, catalogOptions, deviceIdentity);
+
             IEntitlementService entitlement = useMockCatalog
                 ? new NullEntitlementService()
                 : new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);

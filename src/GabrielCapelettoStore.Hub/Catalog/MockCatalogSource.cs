@@ -25,6 +25,8 @@ public sealed class MockCatalogSource : ICatalogSource
                 Version = "1.0.0",
                 Summary = "Sample app for paging",
                 Icon = Glyphs[i % Glyphs.Length],
+                // Every 5th app is a developer-stage app, to exercise the DEV badge.
+                Stage = i % 5 == 0 ? "developer" : "released",
             });
         }
 

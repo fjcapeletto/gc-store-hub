@@ -103,6 +103,13 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool IsNew => Status == NoveltyStatus.New;
     public bool IsUpdated => Status == NoveltyStatus.Updated;
 
+    /// <summary>Developer-stage app (only present for developer-marked devices); shows a "DEV" badge.</summary>
+    public bool IsDeveloper => string.Equals(App.Stage, "developer", StringComparison.OrdinalIgnoreCase);
+
+    // DEV takes the top-right badge slot; suppress NEW/UPD there so they don't overlap.
+    public bool ShowNewBadge => IsNew && !IsDeveloper;
+    public bool ShowUpdatedBadge => IsUpdated && !IsDeveloper;
+
     /// <summary>Primary verb: web → Subscribe/Open(inbox); app → Install/Update/Open.</summary>
     public string PrimaryActionText =>
         IsWeb ? (_web!.Subscribed ? "Open" : "Subscribe")

@@ -305,17 +305,23 @@
                                                     <Border Classes="legV" /><Border Classes="legV" /><Border Classes="legV" />
                                                 </StackPanel>
                                             </Grid>
-                                            <Border IsVisible="{Binding IsNew}" Background="{StaticResource BadgeNewBrush}"
+                                            <Border IsVisible="{Binding ShowNewBadge}" Background="{StaticResource BadgeNewBrush}"
                                                     CornerRadius="6" Padding="5,1" HorizontalAlignment="Right"
                                                     VerticalAlignment="Top" Margin="0,0,4,0">
                                                 <TextBlock Text="NEW" FontSize="10" FontWeight="Bold"
                                                            Foreground="{StaticResource BadgeNewTextBrush}" />
                                             </Border>
-                                            <Border IsVisible="{Binding IsUpdated}" Background="{StaticResource BadgeUpdateBrush}"
+                                            <Border IsVisible="{Binding ShowUpdatedBadge}" Background="{StaticResource BadgeUpdateBrush}"
                                                     CornerRadius="6" Padding="5,1" HorizontalAlignment="Right"
                                                     VerticalAlignment="Top" Margin="0,0,4,0">
                                                 <TextBlock Text="UPD" FontSize="10" FontWeight="Bold"
                                                            Foreground="{StaticResource BadgeUpdateTextBrush}" />
+                                            </Border>
+                                            <!-- Developer-stage marker (only shown to developer devices). -->
+                                            <Border IsVisible="{Binding IsDeveloper}" Background="{StaticResource LedAmberBrush}"
+                                                    CornerRadius="6" Padding="5,1" HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top" Margin="0,0,4,0">
+                                                <TextBlock Text="DEV" FontSize="10" FontWeight="Bold" Foreground="#221706" />
                                             </Border>
 
                                             <!-- Locked: bright padlock over the dimmed chip. -->

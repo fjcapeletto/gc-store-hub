@@ -18,6 +18,11 @@ All types ride the **same entitlement pipeline** — build it once, reuse for al
 Everything else (visibility, auth, gate, revoke) is shared. Design the spine once; each type is a thin
 branch on top.
 
+> **Orthogonal to `type`:** an app also has a lifecycle **`stage`** (`released` / `developer`). Everything
+> above applies to `released`; a `developer` app is pre-launch — catalog-visible only to developer
+> devices and delivered unlocked to them, `404` to everyone else. The catalog request now carries the
+> device identity so the server can decide. See [`developer-stage.md`](developer-stage.md).
+
 ## The four types
 
 | `type` | What it is (the discriminator = **who renders the content**) | delivery returns | hub does | status |

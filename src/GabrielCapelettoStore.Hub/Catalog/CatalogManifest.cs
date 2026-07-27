@@ -81,6 +81,13 @@ public sealed record CatalogApp
     public string Type { get; init; } = "app";
 
     /// <summary>
+    /// Lifecycle stage: "released" (default) or "developer". Developer apps appear only for
+    /// developer-marked devices and arrive unlocked; the stage is a purely visual "DEV" badge —
+    /// install/open/subscribe behave like any released app. See contract/developer-stage.md.
+    /// </summary>
+    public string Stage { get; init; } = "released";
+
+    /// <summary>
     /// Optional per-app override of installability. Absent = inherit the device-wide
     /// <see cref="CatalogAccess.State"/> (granted → installable, otherwise → locked).
     /// </summary>
