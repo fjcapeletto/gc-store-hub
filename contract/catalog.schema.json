@@ -85,9 +85,14 @@
           "type": "string",
           "description": "Optional one-line description."
         },
+        "iconUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "OPTIONAL publisher-supplied icon asset (the publisher owns the mark). https only. Format/size/behaviour are the hub's UX envelope — see app-icons.md. The hub fetches and caches it; the URL is the icon's version token: changing it refreshes the icon even when the app version is unchanged (a marketing lever). Preferred over `icon`."
+        },
         "icon": {
           "type": "string",
-          "description": "Optional glyph key for the chip's inner identity (e.g. \"cloud\", \"music\"). A real icon URL may replace this later."
+          "description": "OPTIONAL fallback glyph key from the hub's on-brand vocabulary (e.g. \"cloud\", \"music\") — used only when iconUrl is absent or unfetchable. The recognized keys are documented in app-icons.md; an unrecognized key falls back to a generic chip. The hub draws and tints these; the publisher does not control their pixels."
         },
         "identityMode": {
           "type": "string",
