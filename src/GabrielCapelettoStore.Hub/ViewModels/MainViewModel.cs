@@ -10,7 +10,9 @@ using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
+using GabrielCapelettoStore.Hub.Notifications;
 using GabrielCapelettoStore.Hub.Update;
+using GabrielCapelettoStore.Hub.Web;
 
 namespace GabrielCapelettoStore.Hub.ViewModels;
 
@@ -26,6 +28,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IUpdateService _updateService;
     private readonly IDeliveryService _delivery;
     private readonly IAppInstaller _installer;
+    private readonly WebManager _web;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -43,7 +46,8 @@ public partial class MainViewModel : ViewModelBase
         IEntitlementService entitlement,
         IUpdateService updateService,
         IDeliveryService delivery,
-        IAppInstaller installer)
+        IAppInstaller installer,
+        WebManager web)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
@@ -53,7 +57,9 @@ public partial class MainViewModel : ViewModelBase
         _updateService = updateService;
         _delivery = delivery;
         _installer = installer;
+        _web = web;
         _updateService.StateChanged += OnUpdateStateChanged;
+        _web.Changed += OnWebChanged;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
 
@@ -85,7 +91,8 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel() : this(
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
         new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
-        new NullEntitlementService(), new NullUpdateService(), new NullDeliveryService(), new NullAppInstaller())
+        new NullEntitlementService(), new NullUpdateService(), new NullDeliveryService(), new NullAppInstaller(),
+        new WebManager(new NullWebService(), new NullWebStore(), new NullToastService()))
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -121,8 +128,50 @@ public partial class MainViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowMainArea))]
     public partial bool ShowAccess { get; set; }
 
-    /// <summary>The catalog area shows only when neither Settings nor Access is open.</summary>
-    public bool ShowMainArea => !ShowSettings && !ShowAccess;
+    /// <summary>Whether a web app's inbox (recent deals) is showing instead of the catalog.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
+    public partial bool ShowInbox { get; set; }
+
+    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox) is open.</summary>
+    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox;
+
+    // --- Web app inbox (type: web, e.g. GC Deals) ---
+    [ObservableProperty] public partial string InboxTitle { get; set; } = "";
+    private string _inboxAppId = "";
+    public ObservableCollection<InboxItemViewModel> InboxItems { get; } = [];
+
+    private void OnWebChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        if (ShowInbox && !string.IsNullOrEmpty(_inboxAppId))
+        {
+            LoadInbox(_inboxAppId);
+        }
+
+        Rebuild(DateTimeOffset.UtcNow);
+    });
+
+    private void OpenWebInbox(string appId, string appName)
+    {
+        _inboxAppId = appId;
+        InboxTitle = appName;
+        LoadInbox(appId);
+        ShowSettings = false;
+        ShowAccess = false;
+        ShowInbox = true;
+    }
+
+    private void LoadInbox(string appId)
+    {
+        InboxItems.Clear();
+        foreach (var item in _web.Inbox(appId))
+        {
+            InboxItems.Add(new InboxItemViewModel(item.Title, item.Url, item.PublishedAt, _web.OpenLink));
+        }
+    }
+
+    [RelayCommand]
+    private void CloseInbox() => ShowInbox = false;
 
     // --- Access / licensing (a-posteriori path; see contract/device-identity-provisioning.md) ---
     [ObservableProperty] public partial string AccessName { get; set; } = "";
@@ -378,6 +427,24 @@ public partial class MainViewModel : ViewModelBase
 
         foreach (var app in _manifest.Apps)
         {
+            // Web items (type: web) are a different shape — subscribe/inbox, not install/launch,
+            // and NOT gated by store access (their gate is the delivery poll: 403 = revoked).
+            if (string.Equals(app.Type, "web", StringComparison.OrdinalIgnoreCase))
+            {
+                var web = new WebTile(
+                    Subscribed: _web.IsSubscribed(app.Id),
+                    Revoked: _web.IsRevoked(app.Id),
+                    OfferHeadline: _web.RevokedHeadline(app.Id),
+                    OfferUrl: _web.RevokedUrl(app.Id),
+                    Subscribe: () => _web.Subscribe(app.Id),
+                    Unsubscribe: () => _web.Unsubscribe(app.Id),
+                    OpenInbox: () => OpenWebInbox(app.Id, app.Name));
+                items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline, web: web));
+                signature.Append(app.Id).Append("|web|")
+                         .Append(web.Subscribed ? 'S' : 'u').Append(web.Revoked ? 'R' : '_').Append(';');
+                continue;
+            }
+
             _observation.Apps.TryGetValue(app.Id, out var obs);
             var noveltySince = obs?.NoveltySince ?? now;
             var fresh = now - noveltySince <= FreshnessWindow;

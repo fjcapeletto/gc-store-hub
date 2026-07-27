@@ -68,6 +68,12 @@ public sealed record CatalogApp
     public AppIdentityMode IdentityMode { get; init; } = AppIdentityMode.DeviceOnly;
 
     /// <summary>
+    /// What kind of shelf item this is — decides how the hub delivers/runs it (see app-types.md).
+    /// "app" (packaged, default), "web" (pushed links → external browser), "feed", "api".
+    /// </summary>
+    public string Type { get; init; } = "app";
+
+    /// <summary>
     /// Optional per-app override of installability. Absent = inherit the device-wide
     /// <see cref="CatalogAccess.State"/> (granted → installable, otherwise → locked).
     /// </summary>

@@ -10,7 +10,9 @@ using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Identity;
+using GabrielCapelettoStore.Hub.Notifications;
 using GabrielCapelettoStore.Hub.Update;
+using GabrielCapelettoStore.Hub.Web;
 using GabrielCapelettoStore.Hub.ViewModels;
 using GabrielCapelettoStore.Hub.Views;
 using Microsoft.Extensions.Configuration;
@@ -78,6 +80,8 @@ public partial class App : Application
             IEntitlementService entitlement = new HttpEntitlementService(httpClient, entitlementOptions, deviceIdentity);
             IDeliveryService delivery = new HttpDeliveryService(httpClient, entitlementOptions, deviceIdentity);
             IAppInstaller installer = new AppInstaller(httpClient);
+            IWebService webService = new HttpWebService(httpClient, entitlementOptions, deviceIdentity);
+            var webManager = new WebManager(webService, new FileWebStore(), new ToastService());
 
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
@@ -86,7 +90,7 @@ public partial class App : Application
 
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
-                entitlement, _updateService, delivery, installer);
+                entitlement, _updateService, delivery, installer, webManager);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 
@@ -101,6 +105,9 @@ public partial class App : Application
 
             // Kick off the first catalog fetch; LoadAsync never throws (errors become UI state).
             _ = viewModel.LoadAsync();
+
+            // Start the web-app poller (GC Deals etc.) — notifies even while in the tray.
+            webManager.Start();
 
             // Self-update check — surfaces progress in the header (no-op unless a source is
             // configured AND this is a real Velopack install).

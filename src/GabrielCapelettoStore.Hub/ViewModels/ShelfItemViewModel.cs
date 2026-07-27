@@ -5,10 +5,20 @@ using GabrielCapelettoStore.Hub.Catalog;
 
 namespace GabrielCapelettoStore.Hub.ViewModels;
 
+/// <summary>Web-app tile state + actions (for a `type: web` item like GC Deals).</summary>
+public sealed record WebTile(
+    bool Subscribed,
+    bool Revoked,
+    string? OfferHeadline,
+    string? OfferUrl,
+    Action Subscribe,
+    Action Unsubscribe,
+    Action OpenInbox);
+
 /// <summary>
-/// A single shelf item: the catalog app plus how it reads to the user right now
-/// (installed state, available version, novelty). Immutable per render — the whole
-/// list is rebuilt whenever state changes.
+/// A single shelf item. Two shapes: a packaged <c>app</c> (Install/Open/Update/Uninstall, gated by
+/// the lease) or a <c>web</c> item (Subscribe/Open-inbox/Unsubscribe, NOT gated by store access —
+/// its gate is the delivery poll: 403 = revoked). Immutable per render.
 /// </summary>
 public sealed partial class ShelfItemViewModel : ObservableObject
 {
@@ -17,6 +27,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     private readonly Action<ShelfItemViewModel>? _updateAction;
     private readonly Action<ShelfItemViewModel>? _uninstallAction;
     private readonly Action<string>? _openOfferAction;
+    private readonly WebTile? _web;
     private readonly bool _isOnline;
 
     public ShelfItemViewModel(
@@ -31,7 +42,8 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         CatalogInstall? installOverride = null,
         Action<ShelfItemViewModel>? openAction = null,
         Action<ShelfItemViewModel>? updateAction = null,
-        Action<ShelfItemViewModel>? uninstallAction = null)
+        Action<ShelfItemViewModel>? uninstallAction = null,
+        WebTile? web = null)
     {
         App = app;
         InstalledVersion = installedVersion;
@@ -43,24 +55,36 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         _updateAction = updateAction;
         _uninstallAction = uninstallAction;
         _openOfferAction = openOfferAction;
+        _web = web;
 
-        // Resolution rule (see contract/): an app is installable when its install state says so
-        // (an entitlement-derived override wins over the catalog's own hint), otherwise it
-        // inherits the device-wide access state.
-        access ??= new CatalogAccess();
-        var install = installOverride ?? app.Install;
-        IsLocked = install is not null
-            ? install.State == AppInstallState.Locked
-            : access.State == StoreAccessState.Locked;
-        Offer = install?.Offer ?? access.Offer;
+        if (_web is not null)
+        {
+            // Web items are NOT gated by store access — the gate is the delivery poll (403 = revoked).
+            IsLocked = _web.Revoked;
+            Offer = _web.Revoked
+                ? new CatalogOffer
+                {
+                    Headline = _web.OfferHeadline ?? "You've been removed from this stream",
+                    ActionUrl = _web.OfferUrl ?? "",
+                }
+                : null;
+        }
+        else
+        {
+            access ??= new CatalogAccess();
+            var install = installOverride ?? app.Install;
+            IsLocked = install is not null
+                ? install.State == AppInstallState.Locked
+                : access.State == StoreAccessState.Locked;
+            Offer = install?.Offer ?? access.Offer;
+        }
     }
 
     public CatalogApp App { get; }
     public string Id => App.Id;
     public string Name => App.Name;
+    public bool IsWeb => _web is not null;
 
-    /// <summary>Placeholder inner identity until apps ship real icons — the app's first letter.</summary>
-    public string Initial => string.IsNullOrWhiteSpace(Name) ? "?" : Name.Trim()[..1].ToUpperInvariant();
     public string? Summary => App.Summary;
     public AppIdentityMode IdentityMode => App.IdentityMode;
 
@@ -73,48 +97,51 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool IsNew => Status == NoveltyStatus.New;
     public bool IsUpdated => Status == NoveltyStatus.Updated;
 
-    /// <summary>
-    /// Single version line under the summary:
-    ///  - not installed → the version available to install
-    ///  - update available → the transition installed → available
-    ///  - up to date → the installed version
-    /// </summary>
+    /// <summary>Version/status line under the name.</summary>
     public string VersionSubline =>
-        !IsInstalled ? $"v{AvailableVersion} · available"
+        IsWeb ? (_web!.Subscribed ? "subscribed" : "offers & deals")
+        : !IsInstalled ? $"v{AvailableVersion} · available"
         : UpdateAvailable ? $"v{InstalledVersion} → v{AvailableVersion}"
         : $"v{AvailableVersion} · installed";
 
-    /// <summary>Primary action for this tile: Install (not installed) / Update (newer) / Open (up to date).</summary>
+    /// <summary>Primary action: web → Subscribe/Open(inbox); app → Install/Update/Open.</summary>
     public string PrimaryActionText =>
-        !IsInstalled ? "Install"
+        IsWeb ? (_web!.Subscribed ? "Open" : "Subscribe")
+        : !IsInstalled ? "Install"
         : UpdateAvailable ? "Update"
         : "Open";
 
-    /// <summary>
-    /// Store-access state for this app, resolved from the per-app override or the
-    /// device-wide access. Locked = visible but not installable; show the offer.
-    /// </summary>
     public bool IsLocked { get; }
-
-    /// <summary>The sales hook to surface when locked (per-app offer, else device offer).</summary>
     public CatalogOffer? Offer { get; }
 
     public bool ShowInstallButton => !IsLocked;
-    public bool ShowUninstall => IsInstalled && !IsLocked;
     public string OfferHeadline => Offer?.Headline ?? "Buy store access";
-
-    /// <summary>Dims the app identity (chip + labels) when locked; the lock/CTA stay bright.</summary>
     public double IdentityOpacity => IsLocked ? 0.4 : 1.0;
 
-    /// <summary>Install and Update download from the server → need to be online. Open (already
-    /// installed, up to date) does not — its gate is the lease, checked on click.</summary>
-    private bool NeedsOnline => !IsInstalled || UpdateAvailable;
+    /// <summary>Secondary action: web → Unsubscribe (when subscribed); app → Uninstall (when installed).</summary>
+    public bool ShowSecondary => !IsLocked && (IsWeb ? _web!.Subscribed : IsInstalled);
+    public string SecondaryActionText => IsWeb ? "Unsubscribe" : "Uninstall";
 
+    private bool NeedsOnline => !IsWeb && (!IsInstalled || UpdateAvailable);
     public bool CanPrimary => !IsLocked && (!NeedsOnline || _isOnline);
 
     [RelayCommand]
     private void PrimaryAction()
     {
+        if (IsWeb)
+        {
+            if (_web!.Subscribed)
+            {
+                _web.OpenInbox();
+            }
+            else
+            {
+                _web.Subscribe();
+            }
+
+            return;
+        }
+
         if (!IsInstalled)
         {
             _installAction?.Invoke(this);
@@ -130,7 +157,17 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Uninstall() => _uninstallAction?.Invoke(this);
+    private void SecondaryAction()
+    {
+        if (IsWeb)
+        {
+            _web!.Unsubscribe();
+        }
+        else
+        {
+            _uninstallAction?.Invoke(this);
+        }
+    }
 
     [RelayCommand]
     private void OpenOffer()

@@ -95,6 +95,12 @@
           "default": "device-only",
           "description": "The identity the app declares it needs. Absent means device-only."
         },
+        "type": {
+          "type": "string",
+          "enum": ["app", "web", "feed", "api"],
+          "default": "app",
+          "description": "What kind of shelf item this is — decides how the hub delivers/runs it (see app-types.md). app: packaged binary (install+launch). web: pushed links opened in the external browser (subscribe+notify+inbox; see type-web.md). feed: content rendered by an in-hub reader. api: a descriptor-driven client shell calling a gated API. Absent means app (back-compatible)."
+        },
         "protection": {
           "type": "string",
           "enum": ["sdk", "native"],

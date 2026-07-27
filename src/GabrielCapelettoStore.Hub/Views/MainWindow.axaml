@@ -293,8 +293,8 @@
                                         <Button Classes="unlock" Content="Unlock"
                                                 Command="{Binding OpenOfferCommand}" IsVisible="{Binding IsLocked}"
                                                 ToolTip.Tip="{Binding OfferHeadline}" Margin="0,8,0,0" />
-                                        <Button Content="Uninstall" IsVisible="{Binding ShowUninstall}"
-                                                Command="{Binding UninstallCommand}" Background="Transparent"
+                                        <Button Content="{Binding SecondaryActionText}" IsVisible="{Binding ShowSecondary}"
+                                                Command="{Binding SecondaryActionCommand}" Background="Transparent"
                                                 BorderThickness="0" Foreground="{StaticResource SilkMutedBrush}"
                                                 FontSize="10" Padding="4,2" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                     </StackPanel>
@@ -374,6 +374,37 @@
                     <TextBlock IsVisible="{Binding HasAccessMessage}" Text="{Binding AccessMessage}"
                                Foreground="{StaticResource SilkDimBrush}" TextWrapping="Wrap" />
                 </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ================= INBOX (web app deals) ================= -->
+        <Grid IsVisible="{Binding ShowInbox}" RowDefinitions="Auto,*" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
+                <Button Classes="icon" Command="{Binding CloseInboxCommand}" Content="←" ToolTip.Tip="Back" />
+                <TextBlock Text="{Binding InboxTitle}" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1">
+                <ItemsControl ItemsSource="{Binding InboxItems}" MaxWidth="580" HorizontalAlignment="Left">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InboxItemViewModel">
+                            <Button Command="{Binding OpenCommand}" HorizontalAlignment="Stretch"
+                                    Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
+                                    BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8"
+                                    ToolTip.Tip="{Binding Url}">
+                                <StackPanel HorizontalAlignment="Left" Spacing="2">
+                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding PublishedAt}" FontSize="11"
+                                               Foreground="{StaticResource SilkMutedBrush}" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </ScrollViewer>
         </Grid>
 
