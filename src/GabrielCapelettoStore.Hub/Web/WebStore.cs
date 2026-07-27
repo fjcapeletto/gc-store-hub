@@ -29,6 +29,9 @@ public sealed class WebAppState
 {
     public bool Subscribed { get; set; }
 
+    /// <summary>The app's display name (from the catalog), so toasts can name the right app.</summary>
+    public string? Name { get; set; }
+
     /// <summary>How new items are surfaced (toast policy). Absent in old state = 0 = the default.</summary>
     public WebDeliveryMode DeliveryMode { get; set; } = WebDeliveryMode.IndividualOldestFirst;
 

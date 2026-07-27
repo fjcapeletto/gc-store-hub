@@ -566,12 +566,13 @@ public partial class MainViewModel : ViewModelBase
             // and NOT gated by store access (their gate is the delivery poll: 403 = revoked).
             if (string.Equals(app.Type, "web", StringComparison.OrdinalIgnoreCase))
             {
+                _web.SetDisplayName(app.Id, app.Name);
                 var web = new WebTile(
                     Subscribed: _web.IsSubscribed(app.Id),
                     Revoked: _web.IsRevoked(app.Id),
                     OfferHeadline: _web.RevokedHeadline(app.Id),
                     OfferUrl: _web.RevokedUrl(app.Id),
-                    Subscribe: () => _web.Subscribe(app.Id),
+                    Subscribe: () => _web.Subscribe(app.Id, app.Name),
                     Unsubscribe: () => _web.Unsubscribe(app.Id),
                     OpenInbox: () => OpenWebInbox(app.Id, app.Name),
                     OpenConfig: () => OpenWebConfig(app.Id, app.Name));

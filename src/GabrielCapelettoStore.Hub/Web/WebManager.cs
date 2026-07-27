@@ -114,14 +114,33 @@ public sealed class WebManager
     public IReadOnlyList<WebInboxItem> Inbox(string appId)
         => _state.Apps.TryGetValue(appId, out var a) ? a.Inbox : [];
 
-    public void Subscribe(string appId)
+    public void Subscribe(string appId, string appName)
     {
         var app = GetOrCreate(appId);
         app.Subscribed = true;
+        if (!string.IsNullOrWhiteSpace(appName))
+        {
+            app.Name = appName;
+        }
         _store.Save(_state);
         Changed?.Invoke();
         _ = PollAsync(appId);
     }
+
+    /// <summary>Keep the stored display name current with the catalog (only for apps we already track).</summary>
+    public void SetDisplayName(string appId, string appName)
+    {
+        if (!string.IsNullOrWhiteSpace(appName)
+            && _state.Apps.TryGetValue(appId, out var app)
+            && !string.Equals(app.Name, appName, StringComparison.Ordinal))
+        {
+            app.Name = appName;
+            _store.Save(_state);
+        }
+    }
+
+    private string DisplayName(string appId)
+        => _state.Apps.TryGetValue(appId, out var a) && !string.IsNullOrWhiteSpace(a.Name) ? a.Name! : appId;
 
     public void Unsubscribe(string appId)
     {
@@ -236,7 +255,7 @@ public sealed class WebManager
             {
                 var ordered = OrderNewestFirst(unseen);
                 var links = ordered.Select(i => new ToastLink(i.Title, () => OpenLink(i.Url))).ToList();
-                _toast.ShowList(ordered.Count == 1 ? "New deal" : $"{ordered.Count} new deals", links);
+                _toast.ShowList($"{DisplayName(appId)} · {ordered.Count} new", links);
                 MarkSeen(app, unseen);
                 _store.Save(_state);
                 break;
@@ -317,7 +336,7 @@ public sealed class WebManager
         // Respect a mid-drain switch to silent / an unsubscribe: keep it seen, skip the toast.
         if (app.Subscribed && app.DeliveryMode != WebDeliveryMode.Silent)
         {
-            _toast.Show(p.Title, "GC Deals", () => OpenLink(p.Url));
+            _toast.Show(p.Title, DisplayName(appId), () => OpenLink(p.Url));
         }
 
         if (em.Queue.Count == 0)
