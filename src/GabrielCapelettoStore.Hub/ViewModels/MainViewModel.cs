@@ -161,6 +161,27 @@ public partial class MainViewModel : ViewModelBase
 
     private string _inboxAppId = "";
     public ObservableCollection<InboxItemViewModel> InboxItems { get; } = [];
+    public ObservableCollection<InboxItemViewModel> ReadItems { get; } = [];
+
+    /// <summary>Which inbox tab is showing: unread (default) or read.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowingUnread))]
+    [NotifyPropertyChangedFor(nameof(CurrentInboxItems))]
+    public partial bool InboxShowRead { get; set; }
+
+    public bool ShowingUnread => !InboxShowRead;
+
+    /// <summary>The collection bound to the list — swaps with the selected tab.</summary>
+    public ObservableCollection<InboxItemViewModel> CurrentInboxItems => InboxShowRead ? ReadItems : InboxItems;
+
+    [ObservableProperty] public partial int UnreadCount { get; set; }
+    [ObservableProperty] public partial int ReadCount { get; set; }
+
+    [RelayCommand]
+    private void ShowUnreadTab() => InboxShowRead = false;
+
+    [RelayCommand]
+    private void ShowReadTab() => InboxShowRead = true;
 
     private void OnWebChanged() => Dispatcher.UIThread.Post(() =>
     {
@@ -185,6 +206,7 @@ public partial class MainViewModel : ViewModelBase
         InboxGlyphKey = app?.Icon;
         InboxIcon = app?.IconUrl is { } iconUrl ? _icons.Get(iconUrl) : null;
 
+        InboxShowRead = false;
         LoadInbox(appId);
         ShowSettings = false;
         ShowAccess = false;
@@ -390,11 +412,27 @@ public partial class MainViewModel : ViewModelBase
         InboxItems.Clear();
         foreach (var item in _web.Inbox(appId))
         {
-            InboxItems.Add(new InboxItemViewModel(
-                item.Title, item.Url, item.PublishedAt, item.ImageUrl, _web.OpenLink,
-                url => _icons.GetOrFetchAsync(url)));
+            InboxItems.Add(MakeInboxItem(appId, item, isRead: false));
         }
+
+        ReadItems.Clear();
+        foreach (var item in _web.ReadInbox(appId))
+        {
+            ReadItems.Add(MakeInboxItem(appId, item, isRead: true));
+        }
+
+        UnreadCount = InboxItems.Count;
+        ReadCount = ReadItems.Count;
     }
+
+    private InboxItemViewModel MakeInboxItem(string appId, WebInboxItem item, bool isRead)
+        => new(
+            item.Id, item.Title, item.Url, item.PublishedAt, item.ImageUrl, isRead,
+            _web.OpenLink,
+            url => _icons.GetOrFetchAsync(url),
+            markRead: id => _web.MarkRead(appId, id),
+            markUnread: id => _web.MarkUnread(appId, id),
+            delete: id => _web.DeleteItem(appId, id));
 
     [RelayCommand]
     private void CloseInbox() => ShowInbox = false;

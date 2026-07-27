@@ -115,8 +115,57 @@ public sealed class WebManager
         Changed?.Invoke();
     }
 
-    public IReadOnlyList<WebInboxItem> Inbox(string appId)
-        => _state.Apps.TryGetValue(appId, out var a) ? a.Inbox : [];
+    /// <summary>Unread items (the default tab).</summary>
+    public IReadOnlyList<WebInboxItem> Inbox(string appId) => Partition(appId, read: false);
+
+    /// <summary>Items the user marked read (the Read tab).</summary>
+    public IReadOnlyList<WebInboxItem> ReadInbox(string appId) => Partition(appId, read: true);
+
+    private IReadOnlyList<WebInboxItem> Partition(string appId, bool read)
+    {
+        if (!_state.Apps.TryGetValue(appId, out var a))
+        {
+            return [];
+        }
+
+        var readSet = new HashSet<string>(a.ReadIds, StringComparer.Ordinal);
+        return a.Inbox.Where(i => readSet.Contains(i.Id) == read).ToList();
+    }
+
+    public void MarkRead(string appId, string id)
+    {
+        var app = GetOrCreate(appId);
+        if (!app.ReadIds.Contains(id))
+        {
+            app.ReadIds.Add(id);
+            _store.Save(_state);
+            Changed?.Invoke();
+        }
+    }
+
+    public void MarkUnread(string appId, string id)
+    {
+        if (_state.Apps.TryGetValue(appId, out var app) && app.ReadIds.Remove(id))
+        {
+            _store.Save(_state);
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Delete an item client-side: drop it now and suppress the same id if the server resends.</summary>
+    public void DeleteItem(string appId, string id)
+    {
+        var app = GetOrCreate(appId);
+        if (!app.DeletedIds.Contains(id))
+        {
+            app.DeletedIds.Add(id);
+        }
+
+        app.ReadIds.Remove(id);
+        app.Inbox.RemoveAll(i => string.Equals(i.Id, id, StringComparison.Ordinal));
+        _store.Save(_state);
+        Changed?.Invoke();
+    }
 
     public void Subscribe(string appId, string appName)
     {
@@ -220,14 +269,21 @@ public sealed class WebManager
 
         var now = DateTimeOffset.UtcNow;
 
-        // Only items whose scheduled release has arrived are visible at all (future = hidden).
-        var present = outcome.Items.Where(i => IsDue(i, now)).ToList();
+        // Client delete is sanitization: keep suppressing an id only while the server still sends it
+        // (bounds growth); a brand-new id is never pre-suppressed.
+        var incomingIds = new HashSet<string>(outcome.Items.Select(i => i.Id), StringComparer.Ordinal);
+        app.DeletedIds = app.DeletedIds.Where(incomingIds.Contains).ToList();
+        var deleted = new HashSet<string>(app.DeletedIds, StringComparer.Ordinal);
+
+        // Visible = released (deliverAt due) and not deleted by the user.
+        var present = outcome.Items.Where(i => IsDue(i, now) && !deleted.Contains(i.Id)).ToList();
         var presentIds = new HashSet<string>(present.Select(i => i.Id), StringComparer.Ordinal);
 
-        // Bound the seen-set to what's still on the server's list (recent N) so it can't grow forever.
+        // Bound the seen/read sets to what's still present (recent N) so they can't grow forever.
         app.SeenIds = app.SeenIds.Where(presentIds.Contains).ToList();
+        app.ReadIds = app.ReadIds.Where(presentIds.Contains).ToList();
 
-        // The inbox is the present list, newest first, capped.
+        // The inbox is the present list (both tabs), newest first, capped.
         app.Inbox = present
             .OrderByDescending(i => ParseTime(i.PublishedAt) ?? DateTimeOffset.MinValue)
             .Take(InboxCap)
@@ -237,10 +293,10 @@ public sealed class WebManager
             })
             .ToList();
 
-        // Unseen = present, not already surfaced, and not already queued this session.
+        // Unseen = present, not surfaced, not queued, not already read.
         var em = GetEmitter(appId);
         var unseen = present
-            .Where(i => !app.SeenIds.Contains(i.Id) && !em.Keys.Contains(i.Id))
+            .Where(i => !app.SeenIds.Contains(i.Id) && !em.Keys.Contains(i.Id) && !app.ReadIds.Contains(i.Id))
             .ToList();
 
         _store.Save(_state);

@@ -484,8 +484,8 @@
         </Grid>
 
         <!-- ================= INBOX (web app deals) ================= -->
-        <Grid IsVisible="{Binding ShowInbox}" RowDefinitions="Auto,*" Margin="24,20">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
+        <Grid IsVisible="{Binding ShowInbox}" RowDefinitions="Auto,Auto,*" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
                 <Button Classes="icon" Command="{Binding CloseInboxCommand}" Content="←" ToolTip.Tip="Back" />
 
                 <!-- The web app's own icon (publisher mark → glyph fallback), same as its shelf tile. -->
@@ -506,30 +506,100 @@
                            Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
             </StackPanel>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding InboxItems}" MaxWidth="580" HorizontalAlignment="Left">
+            <!-- Tabs: Unread / Read -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="20" Margin="0,0,0,10">
+                <StackPanel Spacing="4">
+                    <Button Content="{Binding UnreadCount, StringFormat='Unread ({0})'}"
+                            Command="{Binding ShowUnreadTabCommand}" Background="Transparent" BorderThickness="0"
+                            Padding="2,0" Cursor="Hand" Foreground="{StaticResource SilkBrush}" FontWeight="SemiBold">
+                        <Button.Styles>
+                            <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                    <Border Height="2" CornerRadius="1" Background="{StaticResource LedGreenBrush}"
+                            IsVisible="{Binding ShowingUnread}" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Button Content="{Binding ReadCount, StringFormat='Read ({0})'}"
+                            Command="{Binding ShowReadTabCommand}" Background="Transparent" BorderThickness="0"
+                            Padding="2,0" Cursor="Hand" Foreground="{StaticResource SilkMutedBrush}" FontWeight="SemiBold">
+                        <Button.Styles>
+                            <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                    <Border Height="2" CornerRadius="1" Background="{StaticResource LedGreenBrush}"
+                            IsVisible="{Binding InboxShowRead}" />
+                </StackPanel>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding CurrentInboxItems}" MaxWidth="580" HorizontalAlignment="Left">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:InboxItemViewModel">
-                            <Button Command="{Binding OpenCommand}" HorizontalAlignment="Stretch"
+                            <Button Classes="inboxRow" Command="{Binding OpenCommand}" HorizontalAlignment="Stretch"
                                     Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
                                     BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8"
                                     ToolTip.Tip="{Binding Url}">
-                                <Grid ColumnDefinitions="Auto,*">
-                                    <!-- Link-preview thumbnail (same as the toast), left of the title. -->
-                                    <Border Grid.Column="0" IsVisible="{Binding HasImage}" Width="52" Height="52"
-                                            CornerRadius="6" ClipToBounds="True" Margin="0,0,12,0"
-                                            VerticalAlignment="Center">
-                                        <Image Source="{Binding Image}" Stretch="UniformToFill"
-                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                <Button.Styles>
+                                    <Style Selector="Button.inboxRow StackPanel.rowActions">
+                                        <Setter Property="Opacity" Value="0" />
+                                        <Setter Property="Transitions">
+                                            <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.1" /></Transitions>
+                                        </Setter>
+                                    </Style>
+                                    <Style Selector="Button.inboxRow:pointerover StackPanel.rowActions">
+                                        <Setter Property="Opacity" Value="1" />
+                                    </Style>
+                                    <Style Selector="Button.rowAction /template/ ContentPresenter#PART_ContentPresenter">
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Style>
+                                    <Style Selector="Button.rowAction:pointerover">
+                                        <Setter Property="Foreground" Value="{StaticResource SilkBrush}" />
+                                    </Style>
+                                </Button.Styles>
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <!-- Icon: link-preview thumbnail, or a web-link glyph fallback. Hover shows the time. -->
+                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="6" ClipToBounds="True"
+                                            Margin="0,0,12,0" VerticalAlignment="Center"
+                                            Background="{StaticResource DieGlowBrush}"
+                                            BorderBrush="{StaticResource BoardBorderBrush}" BorderThickness="1"
+                                            ToolTip.Tip="{Binding TimestampLabel}">
+                                        <Panel>
+                                            <Image Source="{Binding Image}" IsVisible="{Binding HasImage}"
+                                                   Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                            <Path IsVisible="{Binding !HasImage}"
+                                                  Data="M12,3 A9,9 0 1 0 12.01,3 Z M3.5,12 H20.5 M12,3 A13.5,9 0 0 0 12,21 M12,3 A13.5,9 0 0 1 12,21"
+                                                  Stroke="{StaticResource SilkMutedBrush}" StrokeThickness="1.4"
+                                                  Stretch="Uniform" Width="20" Height="20"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Panel>
                                     </Border>
-                                    <StackPanel Grid.Column="1" HorizontalAlignment="Left" Spacing="2"
-                                                VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding PublishedAt}" FontSize="11"
-                                                   Foreground="{StaticResource SilkMutedBrush}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="13"
+                                               Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" />
+
+                                    <!-- Hover actions: mark read/unread + delete (client-side sanitization). -->
+                                    <StackPanel Grid.Column="2" Classes="rowActions" Orientation="Horizontal" Spacing="2"
+                                                VerticalAlignment="Center" Margin="8,0,0,0">
+                                        <Button Classes="rowAction" Content="✓" IsVisible="{Binding CanMarkRead}"
+                                                Command="{Binding MarkReadCommand}" ToolTip.Tip="Mark as read"
+                                                Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
+                                                Foreground="{StaticResource SilkMutedBrush}" FontSize="14" />
+                                        <Button Classes="rowAction" Content="↩" IsVisible="{Binding CanMarkUnread}"
+                                                Command="{Binding MarkUnreadCommand}" ToolTip.Tip="Mark as unread"
+                                                Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
+                                                Foreground="{StaticResource SilkMutedBrush}" FontSize="14" />
+                                        <Button Classes="rowAction" Content="✕"
+                                                Command="{Binding DeleteCommand}" ToolTip.Tip="Delete"
+                                                Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
+                                                Foreground="{StaticResource SilkMutedBrush}" FontSize="14" />
                                     </StackPanel>
                                 </Grid>
                             </Button>

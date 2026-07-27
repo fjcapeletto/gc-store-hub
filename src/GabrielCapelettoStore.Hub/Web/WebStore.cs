@@ -44,6 +44,13 @@ public sealed class WebAppState
     public string? OfferUrl { get; set; }
 
     public List<string> SeenIds { get; set; } = [];
+
+    /// <summary>Client-side sanitization: ids the user marked read (moved to the Read tab).</summary>
+    public List<string> ReadIds { get; set; } = [];
+
+    /// <summary>Client-side sanitization: ids the user deleted — suppressed even if the server resends.</summary>
+    public List<string> DeletedIds { get; set; } = [];
+
     public List<WebInboxItem> Inbox { get; set; } = [];
 }
 
