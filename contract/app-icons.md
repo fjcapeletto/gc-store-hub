@@ -71,15 +71,24 @@ fitting, not layout guarantees.
 
 These are the keys the hub currently recognizes for `icon` (hub-drawn, tinted).
 The set is versioned here; adding a key is a bilateral contract change and a hub
-drawing — it is **not** something the hub does on a whim.
+drawing — it is **not** something the hub does on a whim. Keys are matched
+case-insensitively.
 
-`cloud` / `weather`, `cpu` / `sensor`, `database` / `backup`, `photo` / `photos`,
-`music`, `calendar`, `notes`.
+| `icon` key(s)            | Renders (glyph)                     |
+| ------------------------ | ----------------------------------- |
+| `cloud`, `weather`       | A cloud                             |
+| `cpu`, `sensor`          | A processor die with pin legs       |
+| `database`, `backup`     | A cylinder (stacked disks)          |
+| `photo`, `photos`        | A framed picture with a mountain    |
+| `music`                  | A twin-beamed note                  |
+| `calendar`               | A calendar page with tabs           |
+| `notes`                  | A dog-eared document                |
+| *(any other / absent)*   | **Generic chip** (the fallback)     |
 
-Any other key (e.g. `tag`) is currently unrecognized and resolves to the generic
-chip. The intended fix for such an app is to ship an `iconUrl`, not to grow the
-vocabulary — the vocabulary exists for offline/asset-less degradation, not as the
-primary channel.
+Any key not in this table (e.g. `tag`) is unrecognized and resolves to the
+generic chip. The intended fix for such an app is to ship an `iconUrl`, not to
+grow the vocabulary — the vocabulary exists for offline/asset-less degradation,
+not as the primary channel.
 
 ### Note for GC Deals (`com.gc.deals`)
 

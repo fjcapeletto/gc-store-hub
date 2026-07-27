@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
+using GabrielCapelettoStore.Hub.Icons;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.Notifications;
 using GabrielCapelettoStore.Hub.Update;
@@ -29,6 +30,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IDeliveryService _delivery;
     private readonly IAppInstaller _installer;
     private readonly WebManager _web;
+    private readonly IAppIconCache _icons;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -47,7 +49,8 @@ public partial class MainViewModel : ViewModelBase
         IUpdateService updateService,
         IDeliveryService delivery,
         IAppInstaller installer,
-        WebManager web)
+        WebManager web,
+        IAppIconCache icons)
     {
         _catalogSource = catalogSource;
         _observationStore = observationStore;
@@ -58,8 +61,10 @@ public partial class MainViewModel : ViewModelBase
         _delivery = delivery;
         _installer = installer;
         _web = web;
+        _icons = icons;
         _updateService.StateChanged += OnUpdateStateChanged;
         _web.Changed += OnWebChanged;
+        _icons.Changed += OnIconsChanged;
         DeviceIdentity = new DeviceIdentityViewModel(fingerprintCollector, baselineStore);
     }
 
@@ -92,7 +97,7 @@ public partial class MainViewModel : ViewModelBase
         new DesignCatalogSource(), new NullCatalogStateStore(), new NullInstallStateStore(),
         new NullCatalogCache(), new NullFingerprintCollector(), new NullIdentityBaselineStore(),
         new NullEntitlementService(), new NullUpdateService(), new NullDeliveryService(), new NullAppInstaller(),
-        new WebManager(new NullWebService(), new NullWebStore(), new NullToastService()))
+        new WebManager(new NullWebService(), new NullWebStore(), new NullToastService()), new NullAppIconCache())
     {
         var apps = DesignCatalogSource.SampleCatalog.Apps;
         Apps.Add(new ShelfItemViewModel(apps[0], installedVersion: null, updateAvailable: false, NoveltyStatus.New));
@@ -150,6 +155,9 @@ public partial class MainViewModel : ViewModelBase
 
         Rebuild(DateTimeOffset.UtcNow);
     });
+
+    // An icon finished loading (off-thread) → re-render so the tile swaps glyph → publisher mark.
+    private void OnIconsChanged() => Dispatcher.UIThread.Post(() => Rebuild(DateTimeOffset.UtcNow));
 
     private void OpenWebInbox(string appId, string appName)
     {
@@ -359,6 +367,7 @@ public partial class MainViewModel : ViewModelBase
             {
                 ErrorMessage = null;
                 Rebuild(now);
+                WarmIcons();
                 OfflineNotice =
                     !online ? "Can't reach the store server — access is limited until it's back."
                     : catalogFromCache ? $"Showing last known catalog · synced {RelativeTime(cacheAge, now)}"
@@ -406,6 +415,29 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Kick off (fire-and-forget) fetching any publisher icons not yet in the cache.</summary>
+    private void WarmIcons()
+    {
+        if (_manifest is null)
+        {
+            return;
+        }
+
+        var urls = new List<string>();
+        foreach (var app in _manifest.Apps)
+        {
+            if (!string.IsNullOrWhiteSpace(app.IconUrl))
+            {
+                urls.Add(app.IconUrl!);
+            }
+        }
+
+        if (urls.Count > 0)
+        {
+            _ = _icons.WarmAsync(urls);
+        }
+    }
+
     /// <summary>Rebuilds the shelves from the current manifest + observation + install state.</summary>
     private void Rebuild(DateTimeOffset now)
     {
@@ -439,9 +471,11 @@ public partial class MainViewModel : ViewModelBase
                     Subscribe: () => _web.Subscribe(app.Id),
                     Unsubscribe: () => _web.Unsubscribe(app.Id),
                     OpenInbox: () => OpenWebInbox(app.Id, app.Name));
-                items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline, web: web));
+                var webIcon = app.IconUrl is { } wu ? _icons.Get(wu) : null;
+                items.Add(new ShelfItemViewModel(app, null, false, NoveltyStatus.None, IsOnline, web: web, icon: webIcon));
                 signature.Append(app.Id).Append("|web|")
-                         .Append(web.Subscribed ? 'S' : 'u').Append(web.Revoked ? 'R' : '_').Append(';');
+                         .Append(web.Subscribed ? 'S' : 'u').Append(web.Revoked ? 'R' : '_')
+                         .Append(webIcon is null ? '_' : 'i').Append(';');
                 continue;
             }
 
@@ -480,13 +514,14 @@ public partial class MainViewModel : ViewModelBase
                 }
             }
 
+            var appIcon = app.IconUrl is { } au ? _icons.Get(au) : null;
             var item = new ShelfItemViewModel(
                 app, installedVersion, updateAvailable, status, IsOnline, OnInstall, access, OpenOffer,
-                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnUninstall);
+                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnUninstall, icon: appIcon);
             items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')
-                     .Append(item.IsLocked ? 'L' : '_').Append(';');
+                     .Append(item.IsLocked ? 'L' : '_').Append(appIcon is null ? '_' : 'i').Append(';');
         }
 
         AppCount = items.Count;

@@ -61,7 +61,14 @@ public sealed record CatalogApp
     public required string Version { get; init; }
     public string? Summary { get; init; }
 
-    /// <summary>Glyph key for the chip's inner identity (e.g. "cloud", "music"); a real icon URL later.</summary>
+    /// <summary>
+    /// Publisher-supplied icon asset (https). Preferred over <see cref="Icon"/>; the hub fetches and
+    /// caches it, keyed by the URL — a changed URL refreshes the mark (see contract/app-icons.md).
+    /// </summary>
+    public string? IconUrl { get; init; }
+
+    /// <summary>Fallback glyph key for the chip's inner identity (e.g. "cloud", "music"); used only
+    /// when <see cref="IconUrl"/> is absent or unfetchable.</summary>
     public string? Icon { get; init; }
 
     /// <summary>Which identity the app declares it needs. Anchors the three archetypes.</summary>

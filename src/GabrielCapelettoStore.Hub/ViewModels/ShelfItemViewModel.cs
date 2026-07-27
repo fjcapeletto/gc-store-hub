@@ -1,4 +1,5 @@
 using System;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GabrielCapelettoStore.Hub.Catalog;
@@ -43,9 +44,11 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         Action<ShelfItemViewModel>? openAction = null,
         Action<ShelfItemViewModel>? updateAction = null,
         Action<ShelfItemViewModel>? uninstallAction = null,
-        WebTile? web = null)
+        WebTile? web = null,
+        Bitmap? icon = null)
     {
         App = app;
+        Icon = icon;
         InstalledVersion = installedVersion;
         UpdateAvailable = updateAvailable;
         Status = status;
@@ -84,6 +87,10 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public string Id => App.Id;
     public string Name => App.Name;
     public bool IsWeb => _web is not null;
+
+    /// <summary>The publisher's resolved icon (from iconUrl), or null → fall back to the glyph.</summary>
+    public Bitmap? Icon { get; }
+    public bool HasIcon => Icon is not null;
 
     public string? Summary => App.Summary;
     public AppIdentityMode IdentityMode => App.IdentityMode;

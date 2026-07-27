@@ -9,6 +9,7 @@ using Avalonia.Platform;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
+using GabrielCapelettoStore.Hub.Icons;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.Notifications;
 using GabrielCapelettoStore.Hub.Update;
@@ -82,6 +83,7 @@ public partial class App : Application
             IAppInstaller installer = new AppInstaller(httpClient);
             IWebService webService = new HttpWebService(httpClient, entitlementOptions, deviceIdentity);
             var webManager = new WebManager(webService, new FileWebStore(), new ToastService());
+            IAppIconCache iconCache = new FileAppIconCache(httpClient);
 
             IIdentityBaselineStore baselineStore = new FileIdentityBaselineStore();
 
@@ -90,7 +92,7 @@ public partial class App : Application
 
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
-                entitlement, _updateService, delivery, installer, webManager);
+                entitlement, _updateService, delivery, installer, webManager, iconCache);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 

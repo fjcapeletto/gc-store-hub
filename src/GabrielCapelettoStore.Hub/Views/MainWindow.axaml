@@ -229,10 +229,20 @@
                                                         <Border Width="60" Height="60" CornerRadius="11"
                                                                 Background="{StaticResource DieGlowBrush}"
                                                                 BorderBrush="{StaticResource CopperDimBrush}" BorderThickness="1">
-                                                            <Path Data="{Binding App.Icon, Converter={StaticResource AppGlyph}}"
-                                                                  Fill="{Binding Id, Converter={StaticResource AppAccent}}"
-                                                                  Stretch="Uniform" Width="34" Height="34"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            <Panel>
+                                                                <!-- Publisher-supplied mark (iconUrl); falls back to the glyph below. -->
+                                                                <Border IsVisible="{Binding HasIcon}" Width="48" Height="48"
+                                                                        CornerRadius="9" ClipToBounds="True"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Image Source="{Binding Icon}" Stretch="Uniform"
+                                                                           RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                                </Border>
+                                                                <Path IsVisible="{Binding !HasIcon}"
+                                                                      Data="{Binding App.Icon, Converter={StaticResource AppGlyph}}"
+                                                                      Fill="{Binding Id, Converter={StaticResource AppAccent}}"
+                                                                      Stretch="Uniform" Width="34" Height="34"
+                                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Panel>
                                                         </Border>
                                                         <Border VerticalAlignment="Top" Height="3" Margin="10,1,10,0"
                                                                 CornerRadius="2" Background="#26FFFFFF" />
