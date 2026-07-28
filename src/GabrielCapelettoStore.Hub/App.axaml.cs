@@ -12,6 +12,7 @@ using GabrielCapelettoStore.Hub.Entitlement;
 using GabrielCapelettoStore.Hub.Icons;
 using GabrielCapelettoStore.Hub.Identity;
 using GabrielCapelettoStore.Hub.Notifications;
+using GabrielCapelettoStore.Hub.Startup;
 using GabrielCapelettoStore.Hub.Update;
 using GabrielCapelettoStore.Hub.Web;
 using GabrielCapelettoStore.Hub.ViewModels;
@@ -103,6 +104,10 @@ public partial class App : Application
             _updateService = new UpdateService(
                 configuration["Update:GithubRepo"], configuration["Update:FeedUrl"]);
 
+            // Launch-at-startup (mandatory): only for a real installed (Velopack) Windows hub. Re-applied
+            // every launch, so an already-installed client picks it up the first time the updated hub runs.
+            ResolveStartupService().EnsureRegistered();
+
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
                 entitlement, _updateService, delivery, installer, webManager, iconCache);
@@ -130,6 +135,39 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    // Auto-start is managed only for a real installed Windows hub. Velopack installs to
+    // %LocalAppData%\<AppId>\current\<exe> with Update.exe in the parent; the `current` dir is stable
+    // across updates, so ProcessPath there is a durable Run-key target. Source/dev runs (bin\Debug)
+    // don't match → no-op service, registry untouched.
+    private static IStartupService ResolveStartupService()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return new NullStartupService();
+        }
+
+        try
+        {
+            var exe = Environment.ProcessPath;
+            var dir = string.IsNullOrEmpty(exe) ? null : System.IO.Path.GetDirectoryName(exe);
+            if (dir is not null &&
+                string.Equals(System.IO.Path.GetFileName(dir), "current", StringComparison.OrdinalIgnoreCase))
+            {
+                var root = System.IO.Path.GetDirectoryName(dir);
+                if (root is not null && System.IO.File.Exists(System.IO.Path.Combine(root, "Update.exe")))
+                {
+                    return new WindowsStartupService(exe!);
+                }
+            }
+        }
+        catch
+        {
+            // Anything unexpected → don't manage auto-start.
+        }
+
+        return new NullStartupService();
     }
 
     private void SetupTrayIcon()

@@ -1,6 +1,7 @@
 using Avalonia;
 using System;
 using System.Threading;
+using GabrielCapelettoStore.Hub.Startup;
 using Velopack;
 
 namespace GabrielCapelettoStore.Hub;
@@ -22,6 +23,7 @@ sealed class Program
         // exits early for those. WithFirstRun fires only right after a (re)install.
         VelopackApp.Build()
             .OnFirstRun(_ => IsFirstRun = true)
+            .OnBeforeUninstallFastCallback(_ => WindowsStartupService.RemoveAutostart())
             .Run();
 
         // Single instance: if the hub is already running, just exit — its tray icon is there.
