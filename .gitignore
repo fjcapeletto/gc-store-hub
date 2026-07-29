@@ -9,6 +9,7 @@
 contract/*.draft.md
 contract/*.review.md
 contract/*.response.md
+contract/*-response.md
 contract/*.ratify.md
 contract/*.request.md
 contract/*.update.md
