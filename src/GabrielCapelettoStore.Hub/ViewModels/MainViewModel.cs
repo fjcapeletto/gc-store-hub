@@ -8,6 +8,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GabrielCapelettoStore.Hub.Api;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
@@ -33,6 +34,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IAppInstaller _installer;
     private readonly WebManager _web;
     private readonly IAppIconCache _icons;
+    private readonly ApiDescriptorClient? _apiDescriptors;
 
     private CatalogManifest? _manifest;
     private CatalogObservationState _observation = new();
@@ -52,9 +54,13 @@ public partial class MainViewModel : ViewModelBase
         IDeliveryService delivery,
         IAppInstaller installer,
         WebManager web,
-        IAppIconCache icons)
+        IAppIconCache icons,
+        ApiTesterViewModel? apiTester = null,
+        ApiDescriptorClient? apiDescriptors = null)
     {
         _catalogSource = catalogSource;
+        ApiTester = apiTester;
+        _apiDescriptors = apiDescriptors;
         _observationStore = observationStore;
         _installStore = installStore;
         _cache = cache;
@@ -146,8 +152,64 @@ public partial class MainViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowMainArea))]
     public partial bool ShowTileSettings { get; set; }
 
-    /// <summary>The catalog area shows only when no sub-view (Settings / Access / Inbox / Tile settings) is open.</summary>
-    public bool ShowMainArea => !ShowSettings && !ShowAccess && !ShowInbox && !ShowTileSettings;
+    /// <summary>Dev-only api tokenization tester (enabled via GCSTORE_ApiTester=1); null when off.</summary>
+    public ApiTesterViewModel? ApiTester { get; }
+    public bool ApiTesterEnabled => ApiTester is not null;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
+    public partial bool ShowApiTester { get; set; }
+
+    [RelayCommand]
+    private void OpenApiTester()
+    {
+        ShowSettings = false;
+        ShowAccess = false;
+        ShowInbox = false;
+        ShowTileSettings = false;
+        ShowApiShell = false;
+        ShowApiTester = true;
+    }
+
+    [RelayCommand]
+    private void CloseApiTester() => ShowApiTester = false;
+
+    /// <summary>The L1 client shell for an embedded api app (built when the app is opened).</summary>
+    [ObservableProperty] public partial ApiShellViewModel? ApiShell { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMainArea))]
+    public partial bool ShowApiShell { get; set; }
+
+    // Opening a type:api app: it isn't installed — the hub renders it from the app's descriptor (L1),
+    // brokering the token. Falls back to the dev API tester if no descriptor client is wired.
+    private void OnOpenApiApp(ShelfItemViewModel item)
+    {
+        if (_apiDescriptors is not null)
+        {
+            ShowSettings = false;
+            ShowAccess = false;
+            ShowInbox = false;
+            ShowTileSettings = false;
+            ShowApiTester = false;
+            ApiShell = new ApiShellViewModel(_apiDescriptors, item.Id, item.Name, _web.OpenLink, () => ShowApiShell = false);
+            ShowApiShell = true;
+            _ = ApiShell.LoadAsync();
+        }
+        else if (ApiTester is not null)
+        {
+            ApiTester.AppId = item.Id;
+            OpenApiTester();
+        }
+        else
+        {
+            SyncStatus = $"{item.Name}: API client shell coming soon";
+        }
+    }
+
+    /// <summary>The catalog area shows only when no sub-view is open.</summary>
+    public bool ShowMainArea =>
+        !ShowSettings && !ShowAccess && !ShowInbox && !ShowTileSettings && !ShowApiTester && !ShowApiShell;
 
     // --- Web app inbox (type: web, e.g. GC Deals) ---
     [ObservableProperty] public partial string InboxTitle { get; set; } = "";
@@ -864,7 +926,8 @@ public partial class MainViewModel : ViewModelBase
             var appIcon = app.IconUrl is { } au ? _icons.Get(au) : null;
             var item = new ShelfItemViewModel(
                 app, installedVersion, updateAvailable, status, IsOnline, OnInstall, access, OpenOffer,
-                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnOpenTileSettings, icon: appIcon);
+                EntitlementOverride(app.Id), OnOpen, OnUpdate, OnOpenTileSettings, icon: appIcon,
+                openApiAction: OnOpenApiApp);
             items.Add(item);
             signature.Append(app.Id).Append('|').Append((int)status).Append('|')
                      .Append(installedVersion ?? "-").Append('|').Append(app.Version).Append('|')

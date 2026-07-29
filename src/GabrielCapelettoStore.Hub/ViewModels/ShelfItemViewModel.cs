@@ -27,6 +27,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     private readonly Action<ShelfItemViewModel>? _openAction;
     private readonly Action<ShelfItemViewModel>? _updateAction;
     private readonly Action<ShelfItemViewModel>? _openSettingsAction;
+    private readonly Action<ShelfItemViewModel>? _openApiAction;
     private readonly Action<string>? _openOfferAction;
     private readonly WebTile? _web;
     private readonly bool _isOnline;
@@ -45,10 +46,12 @@ public sealed partial class ShelfItemViewModel : ObservableObject
         Action<ShelfItemViewModel>? updateAction = null,
         Action<ShelfItemViewModel>? openSettingsAction = null,
         WebTile? web = null,
-        Bitmap? icon = null)
+        Bitmap? icon = null,
+        Action<ShelfItemViewModel>? openApiAction = null)
     {
         App = app;
         Icon = icon;
+        _openApiAction = openApiAction;
         InstalledVersion = installedVersion;
         UpdateAvailable = updateAvailable;
         Status = status;
@@ -72,6 +75,13 @@ public sealed partial class ShelfItemViewModel : ObservableObject
                 }
                 : null;
         }
+        else if (IsDeveloper)
+        {
+            // Developer-stage apps reach only developer-marked devices, already unlocked by the server
+            // (real enforcement is server-side at delivery). Never lock them client-side.
+            IsLocked = false;
+            Offer = null;
+        }
         else
         {
             access ??= new CatalogAccess();
@@ -87,6 +97,9 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public string Id => App.Id;
     public string Name => App.Name;
     public bool IsWeb => _web is not null;
+
+    /// <summary>A `type: api` app — talks to its own API backend via a brokered token; not installed.</summary>
+    public bool IsApi => string.Equals(App.Type, "api", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The publisher's resolved icon (from iconUrl), or null → fall back to the glyph.</summary>
     public Bitmap? Icon { get; }
@@ -110,9 +123,10 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     public bool ShowNewBadge => IsNew && !IsDeveloper;
     public bool ShowUpdatedBadge => IsUpdated && !IsDeveloper;
 
-    /// <summary>Primary verb: web → Subscribe/Open(inbox); app → Install/Update/Open.</summary>
+    /// <summary>Primary verb: web → Subscribe/Open(inbox); api → Open; app → Install/Update/Open.</summary>
     public string PrimaryActionText =>
         IsWeb ? (_web!.Subscribed ? "Open" : "Subscribe")
+        : IsApi ? "Open"
         : !IsInstalled ? "Install"
         : UpdateAvailable ? "Update"
         : "Open";
@@ -133,7 +147,7 @@ public sealed partial class ShelfItemViewModel : ObservableObject
     /// the state offers (web: subscribe/unsubscribe/delivery; app: uninstall once installed).</summary>
     public bool ShowSettingsGear => true;
 
-    private bool NeedsOnline => !IsWeb && (!IsInstalled || UpdateAvailable);
+    private bool NeedsOnline => !IsWeb && !IsApi && (!IsInstalled || UpdateAvailable);
     public bool CanPrimary => !IsLocked && (!NeedsOnline || _isOnline);
 
     [RelayCommand]
@@ -150,6 +164,12 @@ public sealed partial class ShelfItemViewModel : ObservableObject
                 _web.Subscribe();
             }
 
+            return;
+        }
+
+        if (IsApi)
+        {
+            _openApiAction?.Invoke(this); // api apps aren't installed — open the client surface
             return;
         }
 

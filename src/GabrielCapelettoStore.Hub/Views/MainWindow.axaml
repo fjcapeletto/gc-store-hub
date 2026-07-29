@@ -750,6 +750,10 @@
             <ScrollViewer Grid.Row="1">
                 <StackPanel Spacing="12" MaxWidth="620" HorizontalAlignment="Left">
 
+                    <!-- Dev-only: api tokenization tester (GCSTORE_ApiTester=1). -->
+                    <Button Classes="pill" Content="API tester (dev)" IsVisible="{Binding ApiTesterEnabled}"
+                            Command="{Binding OpenApiTesterCommand}" HorizontalAlignment="Left" />
+
                     <Border CornerRadius="10" Background="{StaticResource BoardPanelBrush}"
                             BorderThickness="1" BorderBrush="{StaticResource BoardBorderBrush}" Padding="16">
                         <StackPanel Spacing="4">
@@ -810,6 +814,158 @@
 
                 </StackPanel>
             </ScrollViewer>
+        </Grid>
+
+        <!-- ================= API TESTER (dev-only) ================= -->
+        <Grid IsVisible="{Binding ShowApiTester}" RowDefinitions="Auto,*" Margin="24,20">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,14">
+                <Button Classes="icon" Command="{Binding CloseApiTesterCommand}" Content="←" ToolTip.Tip="Back" />
+                <TextBlock Text="API tester (dev)" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{StaticResource SilkBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1">
+                <StackPanel MaxWidth="620" HorizontalAlignment="Left" Spacing="10"
+                            DataContext="{Binding ApiTester}">
+                    <!-- 1) Broker a scoped token (tests the server gate + mint) -->
+                    <TextBlock Text="1 · Broker token" FontWeight="SemiBold" Foreground="{StaticResource SilkBrush}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding AppId, Mode=TwoWay}" Watermark="appId"
+                                 FontFamily="Cascadia Mono,Consolas,monospace" />
+                        <Button Grid.Column="1" Classes="pill" Content="Broker token" Margin="8,0,0,0"
+                                Command="{Binding BrokerTokenCommand}" IsEnabled="{Binding NotBusy}" />
+                    </Grid>
+                    <TextBox Text="{Binding TokenInfo}" IsReadOnly="True" AcceptsReturn="True" MinHeight="72"
+                             FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" TextWrapping="Wrap" />
+
+                    <!-- 2) Call the app's own backend with the token (tests the backend's verify) -->
+                    <TextBlock Text="2 · Call the app backend (Authorization: Bearer &lt;token&gt;)" FontWeight="SemiBold"
+                               Foreground="{StaticResource SilkBrush}" Margin="0,6,0,0" />
+                    <TextBlock Text="Method + path. apiBaseUrl comes from the token; you only type the path."
+                               FontSize="11" Foreground="{StaticResource SilkMutedBrush}" />
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding Method, Mode=TwoWay}" Width="80"
+                                 FontFamily="Cascadia Mono,Consolas,monospace" ToolTip.Tip="HTTP method (GET, POST, …)" />
+                        <TextBox Grid.Column="1" Text="{Binding Path, Mode=TwoWay}" Margin="8,0"
+                                 FontFamily="Cascadia Mono,Consolas,monospace" ToolTip.Tip="Path appended to apiBaseUrl, e.g. /health" />
+                        <Button Grid.Column="2" Classes="pill" Content="Send"
+                                Command="{Binding SendCommand}" IsEnabled="{Binding NotBusy}" />
+                    </Grid>
+                    <!-- The exact URL Send will hit, live. -->
+                    <TextBlock Text="{Binding EffectiveUrl, StringFormat='→ {0}'}" FontSize="11"
+                               Foreground="{StaticResource LedGreenBrush}" TextWrapping="Wrap"
+                               FontFamily="Cascadia Mono,Consolas,monospace" />
+                    <TextBox Text="{Binding RequestBody, Mode=TwoWay}" AcceptsReturn="True" MinHeight="56"
+                             Watermark="request body (optional JSON, for POST/PUT)"
+                             FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" />
+                    <TextBox Text="{Binding Response}" IsReadOnly="True" AcceptsReturn="True" MinHeight="140"
+                             FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ================= API SHELL (L1 descriptor-driven) ================= -->
+        <Grid IsVisible="{Binding ShowApiShell}" Margin="24,20">
+        <Grid RowDefinitions="Auto,Auto,*" DataContext="{Binding ApiShell}" x:DataType="vm:ApiShellViewModel">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <Button Classes="icon" Command="{Binding CloseCommand}" Content="←" ToolTip.Tip="Back" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold"
+                               Foreground="{StaticResource SilkBrush}" />
+                    <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource SilkMutedBrush}"
+                               TextWrapping="Wrap" MaxWidth="560" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Actions (from the descriptor) -->
+            <ListBox Grid.Row="1" ItemsSource="{Binding Actions}" SelectedItem="{Binding SelectedAction, Mode=TwoWay}"
+                     Background="Transparent" Margin="0,0,0,10" MaxHeight="120">
+                <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ApiActionViewModel">
+                        <TextBlock Text="{Binding Title}" Padding="6,2" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Selected action: typed form + result -->
+            <ScrollViewer Grid.Row="2" IsVisible="{Binding HasSelection}">
+                <StackPanel DataContext="{Binding SelectedAction}"
+                            x:DataType="vm:ApiActionViewModel" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding Endpoint}" FontSize="11" Foreground="{StaticResource SilkMutedBrush}"
+                               FontFamily="Cascadia Mono,Consolas,monospace" />
+
+                    <ItemsControl ItemsSource="{Binding Fields}" IsVisible="{Binding HasFields}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ApiFieldViewModel">
+                                <Grid ColumnDefinitions="150,*" Margin="0,0,0,6">
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                               Foreground="{StaticResource SilkMutedBrush}" />
+                                    <TextBox Grid.Column="1" Text="{Binding Value, Mode=TwoWay}"
+                                             IsVisible="{Binding IsPlain}"
+                                             FontFamily="Cascadia Mono,Consolas,monospace" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding BoolValue, Mode=TwoWay}"
+                                                  IsVisible="{Binding IsBool}" OnContent="" OffContent="" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding Options}"
+                                              SelectedItem="{Binding Value, Mode=TwoWay}" IsVisible="{Binding IsEnum}"
+                                              HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button Classes="pill" Content="Run" Command="{Binding RunCommand}" IsEnabled="{Binding NotBusy}"
+                            HorizontalAlignment="Left" />
+
+                    <!-- Result -->
+                    <StackPanel IsVisible="{Binding HasResult}">
+                    <StackPanel DataContext="{Binding Result}"
+                                x:DataType="vm:ApiResultViewModel" Spacing="8" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource SilkMutedBrush}" />
+                        <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding IsError}"
+                                   Foreground="{StaticResource LedAmberBrush}" TextWrapping="Wrap" />
+
+                        <ItemsControl ItemsSource="{Binding Records}" IsVisible="{Binding ShowRecords}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecordViewModel">
+                                    <Border Background="{StaticResource BoardPanelBrush}" BorderBrush="{StaticResource BoardBorderBrush}"
+                                            BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                                        <ItemsControl ItemsSource="{Binding Cells}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:FieldCellViewModel">
+                                                    <Grid ColumnDefinitions="150,*" Margin="0,0,0,4">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Label}" IsVisible="{Binding HasLabel}"
+                                                                   Foreground="{StaticResource SilkMutedBrush}" VerticalAlignment="Top"
+                                                                   FontSize="12" TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsText}"
+                                                                   Foreground="{StaticResource SilkBrush}" TextWrapping="Wrap" />
+                                                        <Button Grid.Column="1" Content="{Binding Text}" IsVisible="{Binding IsLink}"
+                                                                Command="{Binding OpenCommand}" Background="Transparent" BorderThickness="0"
+                                                                Padding="0" HorizontalAlignment="Left" Cursor="Hand"
+                                                                Foreground="{StaticResource LedGreenBrush}" />
+                                                        <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsJson}"
+                                                                 IsReadOnly="True" AcceptsReturn="True"
+                                                                 FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Content="{Binding LinkUrl}" IsVisible="{Binding ShowLink}" Command="{Binding OpenLinkCommand}"
+                                Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left"
+                                Cursor="Hand" Foreground="{StaticResource LedGreenBrush}" />
+
+                        <TextBox Text="{Binding RawText}" IsVisible="{Binding ShowText}" IsReadOnly="True" AcceptsReturn="True"
+                                 MinHeight="120" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
         </Grid>
 
     </Panel>

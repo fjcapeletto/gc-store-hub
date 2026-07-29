@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
+using GabrielCapelettoStore.Hub.Api;
 using GabrielCapelettoStore.Hub.Catalog;
 using GabrielCapelettoStore.Hub.Delivery;
 using GabrielCapelettoStore.Hub.Entitlement;
@@ -108,9 +109,20 @@ public partial class App : Application
             // every launch, so an already-installed client picks it up the first time the updated hub runs.
             ResolveStartupService().EnsureRegistered();
 
+            // type:api token broker (shared for embedded + standalone api apps). Dev-only tester
+            // (GCSTORE_ApiTester=1) exercises the tokenization loop without the real app UX.
+            IApiTokenService apiTokenService = useMockCatalog
+                ? new NullApiTokenService()
+                : new HttpApiTokenService(httpClient, entitlementOptions, deviceIdentity);
+            var apiBroker = new ApiTokenBroker(apiTokenService);
+            var apiDescriptors = new ApiDescriptorClient(apiBroker);
+            var apiTester = configuration["ApiTester"] is "1" or "true"
+                ? new ApiTesterViewModel(apiBroker)
+                : null;
+
             var viewModel = new MainViewModel(
                 catalogSource, observationStore, installStore, catalogCache, fingerprintCollector, baselineStore,
-                entitlement, _updateService, delivery, installer, webManager, iconCache);
+                entitlement, _updateService, delivery, installer, webManager, iconCache, apiTester, apiDescriptors);
 
             _mainWindow = new MainWindow { DataContext = viewModel };
 
