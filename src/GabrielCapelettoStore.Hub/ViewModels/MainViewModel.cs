@@ -192,7 +192,9 @@ public partial class MainViewModel : ViewModelBase
             ShowInbox = false;
             ShowTileSettings = false;
             ShowApiTester = false;
-            ApiShell = new ApiShellViewModel(_apiDescriptors, item.Id, item.Name, _web.OpenLink, () => ShowApiShell = false);
+            ApiShell = new ApiShellViewModel(
+                _apiDescriptors, item.Id, item.Name, _web.OpenLink,
+                Views.ApiPopupWindow.Show, () => ShowApiShell = false);
             ShowApiShell = true;
             _ = ApiShell.LoadAsync();
         }

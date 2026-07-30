@@ -29,6 +29,10 @@ public sealed record DescriptorAction
     public string? Title { get; init; }
     public string Method { get; init; } = "GET";
     public string Path { get; init; } = "/";
+
+    /// <summary>On/off toggle: false hides this action from the hub's UI. Absent = on (default true).</summary>
+    public bool Enabled { get; init; } = true;
+
     public IReadOnlyList<ActionInput> Inputs { get; init; } = [];
     public ActionResult? Result { get; init; }
 }

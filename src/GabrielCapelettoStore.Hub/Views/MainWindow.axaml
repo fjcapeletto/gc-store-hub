@@ -76,6 +76,11 @@
             <Setter Property="MinWidth" Value="260" />
         </Style>
 
+        <!-- The global TextBox MinWidth must not force the spinner's inner text box wide. -->
+        <Style Selector="NumericUpDown /template/ TextBox">
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+
         <Style Selector="Border.legH">
             <Setter Property="Width" Value="12" />
             <Setter Property="Height" Value="6" />
@@ -891,31 +896,49 @@
             <!-- Selected action: typed form + result -->
             <ScrollViewer Grid.Row="2" IsVisible="{Binding HasSelection}">
                 <StackPanel DataContext="{Binding SelectedAction}"
-                            x:DataType="vm:ApiActionViewModel" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+                            x:DataType="vm:ApiActionViewModel" Spacing="10" MaxWidth="640" HorizontalAlignment="Stretch">
                     <TextBlock Text="{Binding Endpoint}" FontSize="11" Foreground="{StaticResource SilkMutedBrush}"
                                FontFamily="Cascadia Mono,Consolas,monospace" />
 
-                    <ItemsControl ItemsSource="{Binding Fields}" IsVisible="{Binding HasFields}">
+                    <!-- Wide fields (string / date): label on top, input full width. -->
+                    <ItemsControl ItemsSource="{Binding WideFields}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ApiFieldViewModel">
-                                <Grid ColumnDefinitions="150,*" Margin="0,0,0,6">
-                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,0,3"
                                                Foreground="{StaticResource SilkMutedBrush}" />
-                                    <TextBox Grid.Column="1" Text="{Binding Value, Mode=TwoWay}"
-                                             IsVisible="{Binding IsPlain}"
+                                    <TextBox Text="{Binding Value, Mode=TwoWay}" HorizontalAlignment="Stretch"
                                              FontFamily="Cascadia Mono,Consolas,monospace" />
-                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding BoolValue, Mode=TwoWay}"
-                                                  IsVisible="{Binding IsBool}" OnContent="" OffContent="" />
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding Options}"
-                                              SelectedItem="{Binding Value, Mode=TwoWay}" IsVisible="{Binding IsEnum}"
-                                              HorizontalAlignment="Stretch" />
-                                </Grid>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Button Classes="pill" Content="Run" Command="{Binding RunCommand}" IsEnabled="{Binding NotBusy}"
-                            HorizontalAlignment="Left" />
+                    <!-- Compact fields (spinner / toggle / dropdown) + Run, inline on one row (wraps if needed). -->
+                    <WrapPanel Orientation="Horizontal">
+                        <ItemsControl ItemsSource="{Binding CompactFields}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ApiFieldViewModel">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,8">
+                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                   Foreground="{StaticResource SilkMutedBrush}" />
+                                        <NumericUpDown Value="{Binding NumberValue, Mode=TwoWay}" IsVisible="{Binding IsNumber}"
+                                                       Minimum="0" Increment="1" FormatString="0" Width="110"
+                                                       FontFamily="Cascadia Mono,Consolas,monospace" />
+                                        <ToggleSwitch IsChecked="{Binding BoolValue, Mode=TwoWay}"
+                                                      IsVisible="{Binding IsBool}" OnContent="" OffContent="" />
+                                        <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Value, Mode=TwoWay}"
+                                                  IsVisible="{Binding IsEnum}" Width="180" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="pill" Content="Run" Command="{Binding RunCommand}" IsEnabled="{Binding NotBusy}"
+                                VerticalAlignment="Center" Margin="0,0,0,8" />
+                    </WrapPanel>
 
                     <!-- Result -->
                     <StackPanel IsVisible="{Binding HasResult}">
@@ -946,6 +969,15 @@
                                                         <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsJson}"
                                                                  IsReadOnly="True" AcceptsReturn="True"
                                                                  FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" />
+                                                        <Button Grid.Column="1" IsVisible="{Binding IsPopup}" Command="{Binding OpenCommand}"
+                                                                Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                                HorizontalAlignment="Left" HorizontalContentAlignment="Left">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Text}" Foreground="{StaticResource SilkBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                                <TextBlock Text="more…" FontSize="11" Foreground="{StaticResource LedGreenBrush}" />
+                                                            </StackPanel>
+                                                        </Button>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

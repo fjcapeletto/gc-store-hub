@@ -23,13 +23,17 @@ public sealed partial class ApiShellViewModel : ObservableObject
     private readonly ApiDescriptorClient _client;
     private readonly string _appId;
     private readonly Action<string> _openLink;
+    private readonly Action<string> _showPopup;
     private readonly Action _close;
 
-    public ApiShellViewModel(ApiDescriptorClient client, string appId, string appName, Action<string> openLink, Action close)
+    public ApiShellViewModel(
+        ApiDescriptorClient client, string appId, string appName,
+        Action<string> openLink, Action<string> showPopup, Action close)
     {
         _client = client;
         _appId = appId;
         _openLink = openLink;
+        _showPopup = showPopup;
         _close = close;
         Title = appName;
     }
@@ -80,9 +84,9 @@ public sealed partial class ApiShellViewModel : ObservableObject
         }
 
         StatusText = load.Descriptor.App?.Summary ?? "";
-        foreach (var action in load.Descriptor.Actions)
+        foreach (var action in load.Descriptor.Actions.Where(a => a.Enabled))
         {
-            Actions.Add(new ApiActionViewModel(_client, _appId, action, _openLink));
+            Actions.Add(new ApiActionViewModel(_client, _appId, action, _openLink, _showPopup));
         }
 
         SelectedAction = Actions.FirstOrDefault();
@@ -96,13 +100,17 @@ public sealed partial class ApiActionViewModel : ObservableObject
     private readonly string _appId;
     private readonly DescriptorAction _action;
     private readonly Action<string> _openLink;
+    private readonly Action<string> _showPopup;
 
-    public ApiActionViewModel(ApiDescriptorClient client, string appId, DescriptorAction action, Action<string> openLink)
+    public ApiActionViewModel(
+        ApiDescriptorClient client, string appId, DescriptorAction action,
+        Action<string> openLink, Action<string> showPopup)
     {
         _client = client;
         _appId = appId;
         _action = action;
         _openLink = openLink;
+        _showPopup = showPopup;
 
         foreach (var input in action.Inputs)
         {
@@ -114,6 +122,10 @@ public sealed partial class ApiActionViewModel : ObservableObject
     public string Endpoint => $"{_action.Method.ToUpperInvariant()} {_action.Path}";
     public ObservableCollection<ApiFieldViewModel> Fields { get; } = [];
     public bool HasFields => Fields.Count > 0;
+
+    /// <summary>String/date fields → full-width blocks; number/bool/enum → compact, inline on one row.</summary>
+    public IEnumerable<ApiFieldViewModel> WideFields => Fields.Where(f => f.IsPlain);
+    public IEnumerable<ApiFieldViewModel> CompactFields => Fields.Where(f => !f.IsPlain);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NotBusy))]
@@ -135,7 +147,7 @@ public sealed partial class ApiActionViewModel : ObservableObject
         {
             var values = Fields.ToDictionary(f => f.Name, f => f.CurrentValue, StringComparer.Ordinal);
             var call = await _client.ExecuteAsync(_appId, _action, values);
-            Result = ApiResultBuilder.Build(call, _action.Result, _openLink);
+            Result = ApiResultBuilder.Build(call, _action.Result, _openLink, _showPopup);
         }
         finally
         {
@@ -160,6 +172,13 @@ public sealed partial class ApiFieldViewModel : ObservableObject
             {
                 BoolValue = d.ValueKind == JsonValueKind.True;
             }
+            else if (Type == "number")
+            {
+                if (d.ValueKind == JsonValueKind.Number && d.TryGetDecimal(out var dec))
+                {
+                    NumberValue = dec;
+                }
+            }
             else
             {
                 Value = d.ValueKind == JsonValueKind.String ? d.GetString() ?? "" : d.ToString();
@@ -174,13 +193,20 @@ public sealed partial class ApiFieldViewModel : ObservableObject
 
     [ObservableProperty] public partial string Value { get; set; } = "";
     [ObservableProperty] public partial bool BoolValue { get; set; }
+    [ObservableProperty] public partial decimal? NumberValue { get; set; }
 
     public bool IsBool => Type == "bool";
     public bool IsEnum => Type == "enum";
-    public bool IsPlain => !IsBool && !IsEnum;
+    public bool IsNumber => Type == "number";
+    public bool IsPlain => !IsBool && !IsEnum && !IsNumber; // string / date → full-width text box
 
     /// <summary>The value to send on the wire.</summary>
-    public string CurrentValue => IsBool ? (BoolValue ? "true" : "false") : Value;
+    public string CurrentValue => Type switch
+    {
+        "bool" => BoolValue ? "true" : "false",
+        "number" => NumberValue?.ToString(CultureInfo.InvariantCulture) ?? "",
+        _ => Value,
+    };
 }
 
 /// <summary>The rendered result of an action call: records (keyValue/table), a link, or raw text/json.</summary>
@@ -220,20 +246,27 @@ public sealed partial class FieldCellViewModel : ObservableObject
 {
     public string Label { get; set; } = "";
     public bool HasLabel => !string.IsNullOrEmpty(Label);
-    public string Text { get; set; } = "";
+    public string Text { get; set; } = "";       // inline text (preview only, for pop-up)
+    public string FullText { get; set; } = "";   // full content, shown in the pop-up modal
     public string? Url { get; set; }
     public Action<string>? OpenLink { get; set; }
+    public Action<string>? ShowPopup { get; set; }
 
     public bool IsText { get; set; }
     public bool IsLink { get; set; }
     public bool IsJson { get; set; }
+    public bool IsPopup { get; set; }
 
     [RelayCommand]
     private void Open()
     {
-        if (!string.IsNullOrEmpty(Url))
+        if (IsLink && !string.IsNullOrEmpty(Url))
         {
             OpenLink?.Invoke(Url);
+        }
+        else if (IsPopup)
+        {
+            ShowPopup?.Invoke(FullText);
         }
     }
 }
@@ -243,7 +276,7 @@ internal static class ApiResultBuilder
 {
     private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
 
-    public static ApiResultViewModel Build(ApiCallResult call, ActionResult? spec, Action<string> openLink)
+    public static ApiResultViewModel Build(ApiCallResult call, ActionResult? spec, Action<string> openLink, Action<string> showPopup)
     {
         if (call.Error is not null)
         {
@@ -282,7 +315,7 @@ internal static class ApiResultBuilder
 
         if (render == "keyValue")
         {
-            vm.Records.Add(BuildRecord(root, fields, openLink));
+            vm.Records.Add(BuildRecord(root, fields, openLink, showPopup));
             vm.ShowRecords = true;
             return vm;
         }
@@ -294,7 +327,7 @@ internal static class ApiResultBuilder
             {
                 foreach (var el in arr.EnumerateArray())
                 {
-                    vm.Records.Add(BuildRecord(el, fields, openLink));
+                    vm.Records.Add(BuildRecord(el, fields, openLink, showPopup));
                 }
                 vm.ShowRecords = true;
             }
@@ -309,25 +342,25 @@ internal static class ApiResultBuilder
         return vm;
     }
 
-    private static RecordViewModel BuildRecord(JsonElement obj, IReadOnlyDictionary<string, string> fields, Action<string> openLink)
+    private static RecordViewModel BuildRecord(JsonElement obj, IReadOnlyDictionary<string, string> fields, Action<string> openLink, Action<string> showPopup)
     {
         var record = new RecordViewModel();
         if (obj.ValueKind == JsonValueKind.Object)
         {
             foreach (var p in obj.EnumerateObject())
             {
-                record.Cells.Add(BuildCell(p.Name, p.Value, fields, openLink));
+                record.Cells.Add(BuildCell(p.Name, p.Value, fields, openLink, showPopup));
             }
         }
         else
         {
-            record.Cells.Add(BuildCell("", obj, fields, openLink));
+            record.Cells.Add(BuildCell("", obj, fields, openLink, showPopup));
         }
 
         return record;
     }
 
-    private static FieldCellViewModel BuildCell(string name, JsonElement value, IReadOnlyDictionary<string, string> fields, Action<string> openLink)
+    private static FieldCellViewModel BuildCell(string name, JsonElement value, IReadOnlyDictionary<string, string> fields, Action<string> openLink, Action<string> showPopup)
     {
         var cell = new FieldCellViewModel { Label = name };
         var render = fields.TryGetValue(name, out var r)
@@ -338,6 +371,15 @@ internal static class ApiResultBuilder
         {
             case "link":
                 cell.IsLink = true; cell.Url = AsString(value); cell.Text = cell.Url ?? ""; cell.OpenLink = openLink;
+                break;
+            case "pop-up":
+            case "popup":
+                cell.IsPopup = true;
+                cell.FullText = value.ValueKind is JsonValueKind.Object or JsonValueKind.Array
+                    ? Serialize(value)
+                    : AsString(value) ?? "";
+                cell.Text = Preview(cell.FullText, 250);
+                cell.ShowPopup = showPopup;
                 break;
             case "html":
                 cell.IsText = true; cell.Text = HtmlToText(AsString(value) ?? "");
@@ -414,6 +456,9 @@ internal static class ApiResultBuilder
     };
 
     private static string Serialize(JsonElement v) => JsonSerializer.Serialize(v, Pretty);
+
+    private static string Preview(string s, int max)
+        => s.Length <= max ? s : s[..max].TrimEnd() + "…";
 
     private static string FormatDate(string s)
         => DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture,

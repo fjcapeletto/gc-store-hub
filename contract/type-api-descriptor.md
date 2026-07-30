@@ -102,6 +102,10 @@ Authorization: Bearer <the scoped Ed25519 token>
 - `title` — button/tab label in the shell.
 - `method` — `GET | POST | PUT | PATCH | DELETE`.
 - `path` — appended to `apiBaseUrl`. May contain `{name}` segments, filled from `in: "path"` inputs.
+- `enabled` — optional bool, default **true**. A simple on/off toggle: `false` hides the action from
+  the hub's UI (the app chooses which endpoints to expose). Absent = on. *(Owner note: today the app
+  decides via the descriptor; later this becomes operator/user-configurable in the hub, but the
+  descriptor stays the default.)*
 - `inputs[]` — the form the hub renders (below).
 - `result.render` — how the hub renders the response (below).
 
@@ -137,9 +141,13 @@ Unknown/absent container hint ⇒ `json`.
 
 ### `result.fields` — per-field render (optional, additive)
 An optional map `fieldName → fieldRender` layered on `keyValue` (per field) or `table` (per column).
-Field-render vocabulary: `text | number | bool | date | datetime | link | html | json`.
+Field-render vocabulary: `text | number | bool | date | datetime | link | html | json | pop-up`.
 - `link` → clickable, external browser; `html` → the sandboxed no-script view; `json` → code block;
   `date` / `datetime` → formatted; `text`/`number`/`bool` → plain.
+- `pop-up` → shows only the first **250 characters** inline (a clickable preview); clicking it opens a
+  modal (fixed **500px** wide, vertical scroll if needed) with the **full** field value and an **✕**
+  close button that returns to the data view. For long text (job descriptions, notes) that would
+  otherwise dominate a row.
 - A field with no entry falls back to plain scalar / `json` — the same graceful-degrade rule. Apps that
   don't need it omit it entirely.
 

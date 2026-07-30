@@ -68,6 +68,26 @@ public partial class MainWindow : Window
 
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
+    // The api client shell needs room; grow the window while it's open, restore on back.
+    private const double HubWidth = 560, HubHeight = 624;
+    private const double ShellWidth = 800, ShellHeight = 600;
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (DataContext is MainViewModel vm)
+        {
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(MainViewModel.ShowApiShell))
+                {
+                    Width = vm.ShowApiShell ? ShellWidth : HubWidth;
+                    Height = vm.ShowApiShell ? ShellHeight : HubHeight;
+                }
+            };
+        }
+    }
+
     private void Refresh()
     {
         var nowUtc = DateTime.UtcNow;
