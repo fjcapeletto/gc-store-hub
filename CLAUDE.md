@@ -51,8 +51,13 @@ belongs in the private backend and must not appear here.
 
 ## Working agreements
 
+> Full conduct & process rules live in [`WORK-AGREEMENTS.md`](WORK-AGREEMENTS.md) — the
+> canonical, portable copy that travels with the repo. Read it alongside this file. The
+> essentials:
+
 - **Git is owner-controlled.** Do not stage, commit, push, or branch unless
-  asked. Leave the tree commit-ready and hand off.
+  asked. Leave the tree commit-ready and hand off. A commit and a push are
+  separate approvals; never push without a fresh green light for that push.
 - **`docs/` and `BACKLOG.md` are versioned with the code** — they are committed
   normally, not kept local. Keep them sanitized like everything else in this
   public repo (no secrets, backend internals, or deploy topology).
