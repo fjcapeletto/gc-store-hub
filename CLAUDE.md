@@ -53,5 +53,8 @@ belongs in the private backend and must not appear here.
 
 - **Git is owner-controlled.** Do not stage, commit, push, or branch unless
   asked. Leave the tree commit-ready and hand off.
+- **`docs/` and `BACKLOG.md` are versioned with the code** — they are committed
+  normally, not kept local. Keep them sanitized like everything else in this
+  public repo (no secrets, backend internals, or deploy topology).
 - Keep build output quiet; surface logs only on failure.
 - Run one topic at a time; don't fan out parallel decisions.
