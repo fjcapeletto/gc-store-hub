@@ -11,11 +11,16 @@ contract/*.review.md
 contract/*.response.md
 contract/*-response.md
 contract/*.ratify.md
+contract/*-ratify.md
 contract/*.request.md
 contract/*.update.md
 contract/*-handoff.md
 contract/*.hub-*.md
 contract/*.backend-*.md
+
+# Internal build/rollout recipes — kept local, not part of the public boundary
+# contract. Sanitize before ever publishing one of these.
+contract/web-account-rollout.md
 
 # Build output
 [Bb]in/
